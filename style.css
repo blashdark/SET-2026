@@ -62,20 +62,17 @@ hr{
     min-height: 590px;
     padding-inline: 52px;
     border-left: 1px solid gray;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .right-col > div:first-of-type{
     font-weight: bold;
 }
 
-.right-col:first-child{
+.right-col > :first-child{
     margin-bottom: 8px;
-}
-
-.right-col{
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
 }
 
 .right-col form{
