@@ -8,50 +8,50 @@
         <title>Facebook - Đăng nhập</title>
     </head>
     <body>
-        <div id="login-page">
+        <div id="login-page" class="login-page">
             <div>
-                <div class="wrapper">
-                    <div class="left-col">
-                        <div class="welcome-section">
+                <div class="login">
+                    <div class="login__left">
+                        <div class="login__welcome">
                             <div>
-                                <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em">
+                                <svg class="login__logo" viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em">
                                     <path
                                         d="M22 12.037C22 6.494 17.523 2 12 2S2 6.494 2 12.037c0 4.707 3.229 8.656 7.584 9.741v-6.674H7.522v-3.067h2.062v-1.322c0-3.416 1.54-5 4.882-5 .634 0 1.727.125 2.174.25v2.78a12.807 12.807 0 0 0-1.155-.037c-1.64 0-2.273.623-2.273 2.244v1.085h3.266l-.56 3.067h-2.706V22C18.164 21.4 22 17.168 22 12.037z"
                                     ></path>
                                 </svg>
                             </div>
                             <div>
-                                <span>Khám phá những điều <span>bạn yêu thích</span>.</span>
+                                <span>Khám phá những điều <span class="login__highlight">bạn yêu thích</span>.</span>
                             </div>
                         </div>
-                        <img alt="" src="https://static.xx.fbcdn.net/rsrc.php/yb/r/HpEiFYDux5j.webp" />
+                        <img class="login__image" alt="" src="https://static.xx.fbcdn.net/rsrc.php/yb/r/HpEiFYDux5j.webp" />
                     </div>
-                    <div class="right-col">
-                        <div>
+                    <div class="login__right">
+                        <div class="login__heading">
                             <span>
                                 Đăng nhập vào Facebook
                             </span>
                         </div>
                         <div>
-                            <form method="POST">
-                                <div class="form-input">
-                                    <input type="text" name="email" value=""/>
-                                    <label for="email" >Email hoặc số di động</label>
+                            <form class="login-form" method="POST">
+                                <div class="login-form__field">
+                                    <input class="login-form__input" type="text" name="email" value=""/>
+                                    <label class="login-form__label" for="email" >Email hoặc số di động</label>
                                 </div>
-                                <div class="form-input">
-                                    <input type="password" name="pass" value=""/>
-                                    <label for="pass">Mật khẩu</label>
+                                <div class="login-form__field">
+                                    <input class="login-form__input" type="password" name="pass" value=""/>
+                                    <label class="login-form__label" for="pass">Mật khẩu</label>
                                 </div>
-                                <a class="login-btn" href="#">
+                                <a class="login-form__button login-form__button--primary" href="#">
                                     <span>Đăng nhập</span>
                                 </a>
-                                <a class="forgot-btn" href="/recover/initiate/?privacy_mutation_token=eyJ0eXBlIjo1LCJjcmVhdGlvbl90aW1lIjoxNzgzMDg2NTcyfQ%3D%3D&amp;ars=facebook_login">
+                                <a class="login-form__button login-form__button--text" href="/recover/initiate/?privacy_mutation_token=eyJ0eXBlIjo1LCJjcmVhdGlvbl90aW1lIjoxNzgzMDg2NTcyfQ%3D%3D&amp;ars=facebook_login">
                                     <span>Quên mật khẩu?</span>
                                 </a>
-                                <a class="register-btn" href="/reg/?entry_point=login&next=">
+                                <a class="login-form__button login-form__button--secondary" href="/reg/?entry_point=login&next=">
                                     <span>Tạo tài khoản mới</span>
                                 </a>
-                                <div>
+                                <div class="login-form__brand">
                                     <svg aria-label="Logo Meta" role="img" viewBox="0 0 500 100">
                                         <defs>
                                             <linearGradient
@@ -136,143 +136,143 @@
                     </div>
                 </div>
             </div>
-            <div>
+            <div class="login-page__divider">
                 <hr />
             </div>
-            <footer>
-                <div class="lang">
-                    <div>
+            <footer class="footer">
+                <div class="footer__languages">
+                    <div class="footer__item">
                         <span>Tiếng Việt</span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >English (UK)</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >English (UK)</a></span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >中文(台灣)</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >中文(台灣)</a></span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >한국어</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >한국어</a></span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >日本語</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >日本語</a></span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >Français (France)</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >Français (France)</a></span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >ภาษาไทย</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >ภาษาไทย</a></span
                         >
                     </div>
-                    <div>
-                        <span><a href="#" role="link" tabindex="0" >Ngôn ngữ khác...</a></span
-                        >
-                    </div>
-                </div>
-                <div>
-                    <div>
-                        <span><a href="https://www.facebook.com/reg/" role="link" tabindex="0" target="_self" >Đăng ký</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/login/" role="link" tabindex="0" target="_self" >Đăng nhập</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fmessenger.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Messenger</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/lite/" role="link" tabindex="0" target="_self" >Facebook Lite</a></span
-                        >
-                    </div>
-                    <div>
-                        <span dir="auto"><a href="https://www.facebook.com/watch/" role="link" tabindex="0" target="_self" >Video</a>
-                        </span>
-                    </div>
-                    <div>
-                        <span dir="auto"><a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fabout.meta.com%2Ftechnologies%2Fmeta-pay&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Meta Pay</a>
-                        </span>
-                    </div>
-                    <div>
-                        <span><a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Cửa hàng trên Meta</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.meta.com/quest/" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Meta Quest</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.meta.com/ai-glasses/ray-ban-meta/" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Ray-Ban Meta</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.ai%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Meta AI</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.instagram.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Instagram</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.threads.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Threads</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/privacy/policy/?entry_point=facebook_page_footer" role="link" tabindex="0" target="_self" >Chính sách quyền riêng tư</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/privacy/center/?entry_point=facebook_page_footer" role="link" tabindex="0" target="_self" >Trung tâm quyền riêng tư</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/about/" role="link" tabindex="0" target="_self" >Giới thiệu</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/ad_campaign/landing.php?placement=pflo&amp;campaign_id=402047449186&amp;nav_source=unknown&amp;extra_1=auto" role="link" tabindex="0" target="_self" >Tạo quảng cáo</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/pages/create/?ref_type=site_footer" role="link" tabindex="0" target="_self" >Tạo Trang</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://developers.facebook.com/?ref=pf" role="link" tabindex="0" target="_self" >Nhà phát triển</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/careers/?ref=pf" role="link" tabindex="0" target="_self" >Tuyển dụng</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/policies/cookies/" role="link" tabindex="0" target="_self" >Cookie</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/help/568137493302217" role="link" tabindex="0" target="_self" >Lựa chọn quảng cáo</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/policies?ref=pf" role="link" tabindex="0" target="_self" >Điều khoản</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/help/?ref=pf" role="link" tabindex="0" target="_self" >Trợ giúp</a></span
-                        >
-                    </div>
-                    <div>
-                        <span><a href="https://www.facebook.com/help/637205020878504" role="link" tabindex="0" target="_self" >Tải thông tin liên hệ lên &amp; đối tượng không phải người dùng</a></span
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="#" role="link" tabindex="0" >Ngôn ngữ khác...</a></span
                         >
                     </div>
                 </div>
-                <div>
+                <div class="footer__links">
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/reg/" role="link" tabindex="0" target="_self" >Đăng ký</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/login/" role="link" tabindex="0" target="_self" >Đăng nhập</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://l.facebook.com/l.php?u=https%3A%2F%2Fmessenger.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Messenger</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/lite/" role="link" tabindex="0" target="_self" >Facebook Lite</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span dir="auto"><a class="footer__link" href="https://www.facebook.com/watch/" role="link" tabindex="0" target="_self" >Video</a>
+                        </span>
+                    </div>
+                    <div class="footer__item">
+                        <span dir="auto"><a class="footer__link" href="https://l.facebook.com/l.php?u=https%3A%2F%2Fabout.meta.com%2Ftechnologies%2Fmeta-pay&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Meta Pay</a>
+                        </span>
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Cửa hàng trên Meta</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.meta.com/quest/" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Meta Quest</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.meta.com/ai-glasses/ray-ban-meta/" rel="nofollow noreferrer" role="link" tabindex="0" target="_blank" >Ray-Ban Meta</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.meta.ai%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Meta AI</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.instagram.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Instagram</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://l.facebook.com/l.php?u=https%3A%2F%2Fwww.threads.com%2F&amp;h=AUD0Sd46J3tVpshFl_3OHPN9MfD8Zuvf89Gj8qjGwgYP7a4I07DL_7NbqUDevGf_aGdGahBVYiXCUWlujWC35s2Gsia0jIp_lCKNJrc-dlzSd1vQAo7TgpvJjSLFxsTlt46ZoxljzHFmOzZHEhYcXitU2jF-NU_ontGu4g" rel="nofollow" role="link" tabindex="0" target="_self" >Threads</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/privacy/policy/?entry_point=facebook_page_footer" role="link" tabindex="0" target="_self" >Chính sách quyền riêng tư</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/privacy/center/?entry_point=facebook_page_footer" role="link" tabindex="0" target="_self" >Trung tâm quyền riêng tư</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/about/" role="link" tabindex="0" target="_self" >Giới thiệu</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/ad_campaign/landing.php?placement=pflo&amp;campaign_id=402047449186&amp;nav_source=unknown&amp;extra_1=auto" role="link" tabindex="0" target="_self" >Tạo quảng cáo</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/pages/create/?ref_type=site_footer" role="link" tabindex="0" target="_self" >Tạo Trang</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://developers.facebook.com/?ref=pf" role="link" tabindex="0" target="_self" >Nhà phát triển</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/careers/?ref=pf" role="link" tabindex="0" target="_self" >Tuyển dụng</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/policies/cookies/" role="link" tabindex="0" target="_self" >Cookie</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/help/568137493302217" role="link" tabindex="0" target="_self" >Lựa chọn quảng cáo</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/policies?ref=pf" role="link" tabindex="0" target="_self" >Điều khoản</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/help/?ref=pf" role="link" tabindex="0" target="_self" >Trợ giúp</a></span
+                        >
+                    </div>
+                    <div class="footer__item">
+                        <span><a class="footer__link" href="https://www.facebook.com/help/637205020878504" role="link" tabindex="0" target="_self" >Tải thông tin liên hệ lên &amp; đối tượng không phải người dùng</a></span
+                        >
+                    </div>
+                </div>
+                <div class="footer__copyright">
                     <span dir="auto">Meta ©2026</span>
                 </div>
             </footer>

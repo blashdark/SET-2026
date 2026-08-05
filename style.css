@@ -11,51 +11,51 @@ body{
 hr{
     margin: 0;
 }
-.wrapper {
+.login {
     display: flex;
 }
 
-.wrapper .left-col{
+.login__left{
     display: flex;
     padding-inline: 40px 20px;
 }
 
-.left-col{
+.login__left{
     height: calc(100vh - 70px);
     min-height: 690px;
     box-sizing: border-box;
 }
 
-.left-col img{
+.login__image{
     height: calc(100vh - 70px);
     min-height: 590px;
     margin-inline: 16px;
 }
 
-.welcome-section {
+.login__welcome {
     font-size: 3.75rem;
     padding-block: 40px;
     line-height: 66px;
     font-weight: 600;
 }
 
-.welcome-section svg {
+.login__logo {
     height: 72px;
     width: 72px;
     color: #0064e0;
 }
 
-.welcome-section span > span{
+.login__highlight{
     color: #1877f2;
 }
 
-.welcome-section{
+.login__welcome{
     display: flex;
     flex-direction: column;
     justify-content: space-between;
 }
 
-.right-col{
+.login__right{
     width: 50vw;
     min-width: 550px;
     max-width: 650px;
@@ -67,25 +67,25 @@ hr{
     justify-content: center;
 }
 
-.right-col > div:first-of-type{
+.login__heading{
     font-weight: bold;
 }
 
-.right-col > :first-child{
+.login__heading{
     margin-bottom: 8px;
 }
 
-.right-col form{
+.login-form{
     padding-top: 12px;
 }
 
-.form-input{
+.login-form__field{
     position: relative;
     margin-block: 6px 12px;
     box-sizing: border-box;
 }
 
-.form-input input{
+.login-form__input{
     outline: none;
     padding: 18px 16px 6px;
     width: 100%;
@@ -96,11 +96,11 @@ hr{
     background-color: transparent;
 }
 
-.form-input input:focus {
+.login-form__input:focus {
     border: 1px solid #1877F2;
 }
 
-.form-input label{
+.login-form__label{
     position: absolute;
     top: 50%;
     left: 16px;
@@ -111,13 +111,13 @@ hr{
     transition: all 0.2s ease;
 }
 
-.form-input input:focus + label {
+.login-form__input:focus + .login-form__label {
     top: 10px;
     transform: translateY(0);
     font-size: 12px;
 }
 
-form a{
+.login-form__button{
     display: block;
     width: 100%;
     padding-block: 12px;
@@ -125,29 +125,29 @@ form a{
     text-decoration: none;
 }
 
-.login-btn{
+.login-form__button--primary{
     margin-top: 28px;
     background-color: #0064E0;
     color: #F2F4F6;
     text-align: center;
 }
 
-.login-btn:hover{
+.login-form__button--primary:hover{
     background-color: #005bcd;
 }
 
-.forgot-btn{
+.login-form__button--text{
     margin-top: 12px;
     background-color: transparent;
     color: #000;
     text-align: center;
 }
 
-.forgot-btn:hover{
+.login-form__button--text:hover{
     background-color: #F2F4F6;
 }
 
-.register-btn{
+.login-form__button--secondary{
     margin-top: 52px;
     background-color: transparent;
     color: #0064E0;
@@ -155,21 +155,21 @@ form a{
     border: 1px solid #0064E0;
 }
 
-.register-btn:hover{
+.login-form__button--secondary:hover{
     background-color: #F2F4F6;
 }
 
-.register-btn + div{
+.login-form__brand{
     margin-top: 20px;
     text-align: center;
 }
 
-.register-btn + div svg{
+.login-form__brand svg{
     width: 60px;
     height: 12px;
 }
 
-footer{
+.footer{
     margin: auto;
     display: flex;
     flex-direction: column;
@@ -179,33 +179,35 @@ footer{
     font-size: 14px;
 }
 
-footer a{
+.footer__link{
     color: #666A72;
     text-decoration: none;
 }
 
-footer > div{
+.footer__languages,
+.footer__links,
+.footer__copyright{
     display: flex;
     flex-wrap: wrap;
 }
 
-footer .lang{
+.footer__languages{
     margin-left: -12px;
 }
 
-footer .lang div{
+.footer__languages .footer__item{
     padding: 16px;
 }
 
-footer > :nth-child(2) {
+.footer__links {
     margin-top: -16px;
 }
 
-footer > :nth-child(2) div{
+.footer__links .footer__item{
     padding: 16px 6px 6px;
     margin-top: -6px;
 }
 
-footer > :last-child{
+.footer__copyright{
     padding: 16px 6px 6px;
 }
