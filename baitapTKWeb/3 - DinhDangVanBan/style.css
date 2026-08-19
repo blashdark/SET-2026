@@ -14,16 +14,16 @@
     padding-block: 4px;
 }
 
-.text-formatting-item__title{
+.text-formatting__item-title{
     text-decoration: underline;
     font-weight: bold;
 }
 
-.text-formatting-item__content{
+.text-formatting__item-content{
     font-style: italic;
 }
 
-.text-formatting-item__content--red{
+.text-formatting__item-content--red{
     color: red;
 }
 
