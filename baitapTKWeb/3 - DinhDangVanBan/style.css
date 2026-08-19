@@ -1,0 +1,37 @@
+.text-formatting{
+    padding: 20px 200px;
+}
+
+.text-formatting__header{
+    text-align: center;
+}
+
+.text-formatting__title{
+    color: #00b050;
+}
+
+.text-formatting__item{
+    padding-block: 4px;
+}
+
+.text-formatting-item__title{
+    text-decoration: underline;
+    font-weight: bold;
+}
+
+.text-formatting-item__content{
+    font-style: italic;
+}
+
+.text-formatting-item__content--red{
+    color: red;
+}
+
+.text-formatting__code{
+    font-family: Consolas;
+    margin-top: 12px;
+    padding-left: 50px;
+    padding-block: 4px;
+    background-color: lightgray;
+    color: blue;
+}
