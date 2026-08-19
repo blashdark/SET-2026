@@ -1,0 +1,33 @@
+.poem__header{
+    background-color: pink;
+    text-align: center;
+    margin: 12px;
+}
+
+.poem__title{
+    color: palevioletred;
+    padding: 24px;
+}
+
+.poem__body{
+    margin: 12px;
+    padding: 12px;
+    background-color: lightgoldenrodyellow;
+}
+
+.poem__verse{
+    text-align: center;
+}
+
+.poem__verse--blue{
+    color: blue;
+}
+
+.poem__verse--purple{
+    color: purple;
+}
+
+.poem__verse--green{
+    color: green;
+}
+
