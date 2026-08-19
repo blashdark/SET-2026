@@ -15,8 +15,15 @@
     background-color: lightgoldenrodyellow;
 }
 
+.poem__divider{
+    width: 40%;
+    margin: 18px auto;
+    border-top: 1px solid gray;
+}
+
 .poem__verse{
     text-align: center;
+    font-style: italic;
 }
 
 .poem__verse--blue{
