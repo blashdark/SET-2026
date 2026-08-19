@@ -1,0 +1,75 @@
+@font-face {
+    font-family: 'Wedding';
+    src: url('fonts/UTM Wedding K&T.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+.flower-shop{
+    height: 100vh;
+    background-image: url('hinh/nen-hoa-hong.jpg');
+    background-position: top 20px right;
+    background-repeat: no-repeat;
+    background-size: 60% auto;
+}
+
+.flower-shop__header{
+    text-align: center;
+}
+
+.flower-shop__title{
+    font-family: 'Wedding', sans-serif;
+    color: white;
+    text-shadow: 
+        2px 0 0 #fd3da8,  /* Lớp viền sắc nét sát chữ */
+        0 0 8px #fd3da8,
+        0 0 16px #fd3da8;
+}
+
+.flower-shop__body{
+    display: flex;
+}
+
+.flower-shop__left{
+    flex: 1 0 30%;
+}
+
+.flower-shop__thumb-img{
+    max-width: 100%;
+}
+
+.flower-shop__right{
+    flex: 0 1 100%;
+}
+
+.flower-shop__heading span{
+    background-color: #fe0696;
+    color: #fff;
+}
+
+.flower-shop__list--star{
+    list-style-image: url('hinh/bullet-hoa-tim.png');
+}
+
+.flower-shop__list--dot{
+    list-style-image: url('hinh/bullet-tron-hong.png');
+}
+
+.flower-shop__item--bold{
+    font-weight: bold;
+}
+
+.flower-shop__copyright{
+    padding-left: 24px;
+    color: #9c69bc;
+    font-style: italic;
+}
+
+.flower-shop__copyright span{
+    color: #fa55b0;
+}
+
+.flower-shop__divider{
+    margin-left: -20px;
+    width: 70%;
+}
