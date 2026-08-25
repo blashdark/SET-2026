@@ -49,5 +49,8 @@
 
 .login__form-welcome--bold{
     font-weight: bold;
+}
+
+.login__form-welcome--italic{
     font-style: italic;
 }
