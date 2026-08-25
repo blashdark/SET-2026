@@ -1,0 +1,53 @@
+.login{
+    font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.container{
+    width: 60%;
+    padding-bottom: 5%;
+    border: 2px dotted #cc0000;
+    border-radius: 10px;
+    text-align: center;
+    background-image: url("hinh/login.jpg");
+    background-repeat: no-repeat;
+    background-position: center right;
+    background-size: auto 75%;
+}
+
+.login__title{
+    color: #cc0000;
+}
+
+.login__form-field{
+    margin-block: 8px;
+}
+
+.login__form-input{
+    background-color: #ffcccb;
+    outline: none;
+    border: 1px dotted #cc0000;
+    border-radius: 10px;
+    padding: 4px 8px;
+}
+
+.login__form-button{
+    color: #fff;
+    background-color: #ee0000;
+    border: 2px outset;
+    border-radius: 10px;
+    padding: 4px 6px;
+    font-weight: bold;
+}
+
+.login__form-welcome{
+    color:#cc0000;
+}
+
+.login__form-welcome--bold{
+    font-weight: bold;
+    font-style: italic;
+}
