@@ -1,0 +1,50 @@
+body{
+    min-height: 100vh;
+    margin: 0;
+    background-image: url("hinh/truong_day_thiet_ke_do_hoa.jpg");
+    background-repeat: no-repeat;
+    background-position: left 22% bottom 5%;
+    background-size: 50% auto;
+}
+
+.header__pencil-border{
+    height: fit-content;
+    aspect-ratio: 1316 / 129;
+    background-image: url("hinh/nguyen-tac-trong-thiet-ke-do-hoa.jpg");
+    background-repeat: repeat-x;
+    background-size: 25% auto;
+}
+
+.header__title{
+    margin-top: 0;
+    text-align: center;
+    color: #00ff01;
+}
+
+.course-table{
+    margin: auto;
+    border: 6px solid #00ff01;
+}
+
+.course-table__cell{
+    padding: 4px 8px;
+    border: 1px solid #00ff01;
+}
+
+.course-table__header{
+    padding: 8px 16px;
+    background-color: #00ff01;
+    color: #fff;
+}
+
+.course-table__cell--center{
+    text-align: center;
+}
+
+.course-table__row + :nth-child(2n){
+    background-color: #99ffff;
+}
+
+.course-table__row + :last-child{
+    background-color: #ff9900;
+}
