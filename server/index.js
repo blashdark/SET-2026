@@ -1,17 +1,17 @@
 'use strict';
 
-const http = require('http');
+const http = require('http'); // node:http built-in: create the server
 const db = require('./store');
 const auth = require('./auth');
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3000); // read PORT from the environment
 
 // ---------- HTTP helpers ----------
 
 function send(res, status, data) {
-  const body = JSON.stringify(data);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
-  res.end(body);
+  const body = JSON.stringify(data); // serialize the object to JSON
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) }); // writeHead: status + headers; Buffer.byteLength: exact byte size
+  res.end(body); // end: send the response
 }
 
 function fail(res, status, message) {
@@ -19,7 +19,7 @@ function fail(res, status, message) {
 }
 
 function noContent(res) {
-  res.writeHead(204);
+  res.writeHead(204); // 204: success with no body
   res.end();
 }
 
@@ -27,11 +27,11 @@ function noContent(res) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
-    req.on('data', (chunk) => { raw += chunk; });
-    req.on('end', () => {
-      if (!raw) return resolve({});
+    req.on('data', (chunk) => { raw += chunk; }); // 'data': body arrives in chunks
+    req.on('end', () => { // 'end': the whole body has arrived
+      if (!raw) return resolve({}); // no body -> {}
       try {
-        resolve(JSON.parse(raw));
+        resolve(JSON.parse(raw)); // JSON.parse: parse the raw body
       } catch {
         const err = new Error('Body is not valid JSON');
         err.status = 400;
@@ -45,9 +45,9 @@ function readBody(req) {
 // Read the user from the "Authorization: Bearer <token>" header, or null.
 function currentUser(req) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
-  const userId = auth.readToken(token);
-  return userId ? db.findUserById(userId) : null;
+  const token = header.startsWith('Bearer ') ? header.slice(7) : ''; // strip the 'Bearer ' prefix
+  const userId = auth.readToken(token); // returns the user id, or null
+  return userId ? db.findUserById(userId) : null; // load the user (null if it was deleted)
 }
 
 function publicUser(user) {
@@ -56,7 +56,7 @@ function publicUser(user) {
 
 // Extract a numeric id from a path like '/task/12' with prefix '/task/'.
 function idFrom(path, prefix) {
-  return Number(path.slice(prefix.length));
+  return Number(path.slice(prefix.length)); // cut the prefix, convert the rest to a number
 }
 
 // ---------- handlers ----------
@@ -68,7 +68,7 @@ function signUp(res, body) {
   if (!username || !password) return fail(res, 400, 'username and password are required');
   if (username.length < 3) return fail(res, 400, 'username must be at least 3 characters');
   if (password.length < 6) return fail(res, 400, 'password must be at least 6 characters');
-  if (db.findUserByUsername(username)) return fail(res, 409, 'username already exists');
+  if (db.findUserByUsername(username)) return fail(res, 409, 'username already exists'); // usernames must be unique
 
   const { salt, hash } = auth.hashPassword(password);
   const user = db.createUser(username, hash, salt);
@@ -91,7 +91,7 @@ function login(res, body) {
 function deleteUser(res, id) {
   if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Invalid user id');
   if (!db.findUserById(id)) return fail(res, 404, 'User not found');
-  if (db.countUserTasks(id) > 0) return fail(res, 409, 'User still has tasks and cannot be deleted');
+  if (db.countUserTasks(id) > 0) return fail(res, 409, 'User still has tasks and cannot be deleted'); // block while tasks remain
 
   db.deleteUser(id);
   return noContent(res);
@@ -102,11 +102,11 @@ function createTask(res, body, user) {
   const description = String(body.description ?? '');
   if (!title) return fail(res, 400, 'title is required');
 
-  return send(res, 201, db.createTask(title, description, user.id));
+  return send(res, 201, db.createTask(title, description, user.id)); // owner comes from the token, not the client
 }
 
 function assignTask(res, id, body) {
-  const userId = Number(body.user_id);
+  const userId = Number(body.user_id); // target owner comes from the body
   if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Invalid task id');
   if (!Number.isInteger(userId) || userId <= 0) return fail(res, 400, 'user_id must be a positive integer');
   if (!db.findTaskById(id)) return fail(res, 404, 'Task not found');
@@ -120,7 +120,7 @@ function deleteTask(res, id, user) {
 
   const task = db.findTaskById(id);
   if (!task) return fail(res, 404, 'Task not found');
-  if (task.user_id !== user.id) return fail(res, 403, 'You do not own this task');
+  if (task.user_id !== user.id) return fail(res, 403, 'You do not own this task'); // only the owner can delete
 
   db.deleteTask(id);
   return noContent(res);
@@ -128,9 +128,9 @@ function deleteTask(res, id, user) {
 
 // ---------- server ----------
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => { // called for every request
   const { method } = req;
-  const path = req.url.split('?')[0];
+  const path = req.url.split('?')[0]; // drop the query string
 
   try {
     // Public routes.
@@ -154,4 +154,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+server.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`)); // start listening
