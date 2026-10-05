@@ -11,7 +11,7 @@ const path = require('path');
 const PORT = 4310;
 const BASE = `http://127.0.0.1:${PORT}`;
 // temp data dir -> tests don't touch real data
-const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-task-api-'));
+const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'auth-task-api-')); // fs.mkdtempSync + os.tmpdir: unique temp dir
 
 let failures = 0;
 
@@ -25,16 +25,16 @@ async function request(method, urlPath, { token, body } = {}) {
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const res = await fetch(BASE + urlPath, {
+  const res = await fetch(BASE + urlPath, { // global fetch (Node 18+): built-in HTTP client
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined
   });
   let data = null;
-  const text = await res.text();
+  const text = await res.text(); // read the response body as text
   if (text) {
     try {
-      data = JSON.parse(text);
+      data = JSON.parse(text); // parse JSON responses
     } catch {
       data = text;
     }
@@ -51,8 +51,8 @@ function waitForServer() {
         await fetch(BASE + '/me');
         resolve();
       } catch {
-        if (Date.now() > deadline) return reject(new Error('Server khong khoi dong kip'));
-        setTimeout(tick, 100);
+        if (Date.now() > deadline) return reject(new Error('Server did not start in time'));
+        setTimeout(tick, 100); // setTimeout: retry after 100ms
       }
     };
     tick();
@@ -60,11 +60,11 @@ function waitForServer() {
 }
 
 async function main() {
-  const server = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'index.js')], {
+  const server = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'index.js')], { // child_process.spawn: launch the server process
     env: { ...process.env, PORT: String(PORT), DATA_DIR, JWT_SECRET: 'test-secret' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
-  server.stderr.on('data', (chunk) => process.stderr.write(chunk));
+  server.stderr.on('data', (chunk) => process.stderr.write(chunk)); // forward the child's stderr
 
   try {
     await waitForServer();
@@ -146,11 +146,11 @@ async function main() {
     const notFound = await request('GET', '/nope', { token });
     check('GET /nope -> 404', notFound.status === 404, notFound);
   } finally {
-    server.kill();
-    fs.rmSync(DATA_DIR, { recursive: true, force: true });
+    server.kill(); // stop the child process
+    fs.rmSync(DATA_DIR, { recursive: true, force: true }); // fs.rmSync: delete the temp dir
   }
 
-  console.log(failures === 0 ? '\nTat ca check PASS' : `\n${failures} check FAIL`);
+  console.log(failures === 0 ? '\nAll checks passed' : `\n${failures} check(s) failed`);
   process.exit(failures === 0 ? 0 : 1);
 }
 

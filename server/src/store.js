@@ -6,8 +6,8 @@ const csv = require('./csv');
 
 // allow overriding the data dir via env (for isolated tests)
 const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : path.join(__dirname, '..', 'data');
+  ? path.resolve(process.env.DATA_DIR) // path.resolve: make the env path absolute
+  : path.join(__dirname, '..', 'data'); // path.join: build a path relative to this file
 const USERS_FILE = path.join(DATA_DIR, 'users.csv');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.csv');
 
@@ -15,15 +15,15 @@ const USER_COLUMNS = ['id', 'username', 'password_hash', 'salt', 'created_at'];
 const TASK_COLUMNS = ['id', 'title', 'description', 'user_id', 'created_at'];
 
 function ensureFile(file, columns) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, columns.join(',') + '\n', 'utf8');
+  fs.mkdirSync(DATA_DIR, { recursive: true }); // fs.mkdirSync recursive: create the dir and its parents
+  if (!fs.existsSync(file)) { // fs.existsSync: check the file is present
+    fs.writeFileSync(file, columns.join(',') + '\n', 'utf8'); // write the header row
   }
 }
 
 function readRecords(file, columns) {
   ensureFile(file, columns);
-  const rows = csv.parse(fs.readFileSync(file, 'utf8'));
+  const rows = csv.parse(fs.readFileSync(file, 'utf8')); // fs.readFileSync: read the whole file as utf8
   const body = rows.length > 0 ? rows.slice(1) : []; // drop the header row
   return body
     .filter((row) => row.some((cell) => cell !== '')) // drop empty rows
@@ -39,7 +39,7 @@ function readRecords(file, columns) {
 // rewrite the whole file (header + records)
 function writeRecords(file, columns, records) {
   const rows = [columns, ...records.map((record) => columns.map((column) => record[column] ?? ''))];
-  fs.writeFileSync(file, csv.stringify(rows), 'utf8');
+  fs.writeFileSync(file, csv.stringify(rows), 'utf8'); // fs.writeFileSync: overwrite the file
 }
 
 function nextId(records) {
@@ -82,7 +82,7 @@ const users = {
       username,
       password_hash: passwordHash,
       salt,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString() // new Date().toISOString(): ISO-8601 timestamp
     };
     list.push(user);
     writeRecords(USERS_FILE, USER_COLUMNS, list);
@@ -108,7 +108,7 @@ const tasks = {
       title,
       description: description ?? '',
       user_id: Number(userId),
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString() // new Date().toISOString(): ISO-8601 timestamp
     };
     list.push(task);
     writeRecords(TASKS_FILE, TASK_COLUMNS, list);

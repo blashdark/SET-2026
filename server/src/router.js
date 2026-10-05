@@ -44,7 +44,7 @@ class Router {
   match(method, pathname) {
     for (const route of this.routes) {
       if (route.method !== method) continue;
-      const found = pathname.match(route.regex);
+      const found = pathname.match(route.regex); // String.match: run the anchored regex
       if (!found) continue;
 
       const params = {};
@@ -59,7 +59,7 @@ class Router {
 
   // match path against ANY method -> distinguish 405 (wrong method) from 404 (wrong path)
   pathExists(pathname) {
-    return this.routes.some((route) => route.regex.test(pathname));
+    return this.routes.some((route) => route.regex.test(pathname)); // RegExp.test: boolean match, no captures
   }
 }
 

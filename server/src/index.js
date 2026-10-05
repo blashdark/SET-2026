@@ -11,7 +11,7 @@ require('./routes/auth').register(router);
 require('./routes/user').register(router);
 require('./routes/task').register(router);
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 3000); // process.env.PORT: read the port from the environment
 const METHODS_WITH_BODY = ['POST', 'PUT', 'PATCH']; // only these methods carry a body
 
 // extract token from 'Authorization: Bearer <token>'
@@ -22,9 +22,9 @@ function extractBearer(header) {
   return token;
 }
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => { // http.createServer: build the server with this request handler
   try {
-    const url = new URL(req.url, 'http://localhost');
+    const url = new URL(req.url, 'http://localhost'); // new URL: req.url is path-only, base fills in the origin
     const route = router.match(req.method, url.pathname);
 
     if (!route) {
@@ -56,6 +56,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, () => { // server.listen: start accepting connections
   console.log(`Auth + Task REST API dang chay tai http://localhost:${PORT}`);
 });
