@@ -69,58 +69,77 @@ async function main() {
   try {
     await waitForServer();
 
+    // 1. sign up + duplicate
     const signUp = await request('POST', '/sign-up', { body: { username: 'alice', password: 'secret123' } });
     check('POST /sign-up -> 201', signUp.status === 201 && signUp.data.username === 'alice', signUp);
 
     const dup = await request('POST', '/sign-up', { body: { username: 'alice', password: 'secret123' } });
-    check('POST /sign-up (trung) -> 409', dup.status === 409, dup);
+    check('POST /sign-up (duplicate) -> 409', dup.status === 409, dup);
 
+    // 2. login
     const login = await request('POST', '/login', { body: { username: 'alice', password: 'secret123' } });
     const token = login.data && login.data.accessToken;
     check('POST /login -> 200 + accessToken', login.status === 200 && !!token, login);
 
     const badLogin = await request('POST', '/login', { body: { username: 'alice', password: 'wrong' } });
-    check('POST /login (sai pass) -> 401', badLogin.status === 401, badLogin);
+    check('POST /login (wrong password) -> 401', badLogin.status === 401, badLogin);
 
+    // 3. /me
     const noAuth = await request('GET', '/me');
-    check('GET /me (khong token) -> 401', noAuth.status === 401, noAuth);
+    check('GET /me (no token) -> 401', noAuth.status === 401, noAuth);
 
     const me = await request('GET', '/me', { token });
     check('GET /me -> 200', me.status === 200 && me.data.username === 'alice', me);
 
-    const created = await request('POST', '/task', { token, body: { title: 'Task A', description: 'mo ta' } });
+    // 4. tasks
+    const created = await request('POST', '/task', { token, body: { title: 'Task A', description: 'desc' } });
     check('POST /task -> 201', created.status === 201 && created.data.user_id === 1, created);
 
     await request('POST', '/task', { token, body: { title: 'Task B' } });
 
     const list = await request('GET', '/tasks', { token });
-    check('GET /tasks -> 200 (2 task)', list.status === 200 && Array.isArray(list.data) && list.data.length === 2, list);
+    check('GET /tasks -> 200 (2 tasks)', list.status === 200 && Array.isArray(list.data) && list.data.length === 2, list);
 
     const delUserBlocked = await request('DELETE', '/user/1', { token });
-    check('DELETE /user/1 (con task) -> 409', delUserBlocked.status === 409, delUserBlocked);
+    check('DELETE /user/1 (has tasks) -> 409', delUserBlocked.status === 409, delUserBlocked);
 
-    const assigned = await request('PATCH', '/assign-task/1', { token });
-    check('PATCH /assign-task/1 -> 200', assigned.status === 200 && assigned.data.user_id === 1, assigned);
+    // 5. second user
+    const bob = await request('POST', '/sign-up', { body: { username: 'bob', password: 'secret123' } });
+    const bobLogin = await request('POST', '/login', { body: { username: 'bob', password: 'secret123' } });
+    const bobToken = bobLogin.data.accessToken;
+    check('POST /sign-up bob -> 201', bob.status === 201, bob);
+
+    // 6. assign task 1 to another user (bob)
+    const assigned = await request('PATCH', '/assign-task/1', { token, body: { user_id: bob.data.id } });
+    check('PATCH /assign-task/1 (to bob) -> 200', assigned.status === 200 && assigned.data.user_id === bob.data.id, assigned);
+
+    const assignNoBody = await request('PATCH', '/assign-task/1', { token, body: {} });
+    check('PATCH /assign-task/1 (missing user_id) -> 400', assignNoBody.status === 400, assignNoBody);
+
+    const assignMissingTask = await request('PATCH', '/assign-task/999', { token, body: { user_id: bob.data.id } });
+    check('PATCH /assign-task/999 -> 404', assignMissingTask.status === 404, assignMissingTask);
+
+    const assignMissingUser = await request('PATCH', '/assign-task/2', { token, body: { user_id: 999 } });
+    check('PATCH /assign-task/2 (unknown user) -> 404', assignMissingUser.status === 404, assignMissingUser);
+
+    // 7. ownership after reassignment
+    const aliceDeleteBobTask = await request('DELETE', '/task/1', { token });
+    check('DELETE /task/1 (not owner) -> 403', aliceDeleteBobTask.status === 403, aliceDeleteBobTask);
+
+    const bobDeleteTask = await request('DELETE', '/task/1', { token: bobToken });
+    check('DELETE /task/1 (owner) -> 204', bobDeleteTask.status === 204, bobDeleteTask);
 
     const delMissing = await request('DELETE', '/task/999', { token });
     check('DELETE /task/999 -> 404', delMissing.status === 404, delMissing);
 
-    const delTask = await request('DELETE', '/task/1', { token });
-    check('DELETE /task/1 -> 204', delTask.status === 204, delTask);
+    const aliceDeleteOwn = await request('DELETE', '/task/2', { token });
+    check('DELETE /task/2 (own) -> 204', aliceDeleteOwn.status === 204, aliceDeleteOwn);
 
-    const bob = await request('POST', '/sign-up', { body: { username: 'bob', password: 'secret123' } });
-    const bobLogin = await request('POST', '/login', { body: { username: 'bob', password: 'secret123' } });
-    const bobTask = await request('POST', '/task', {
-      token: bobLogin.data.accessToken,
-      body: { title: 'Bob task' }
-    });
-    const aliceDeleteBobTask = await request('DELETE', `/task/${bobTask.data.id}`, { token });
-    check('DELETE /task (khong so huu) -> 403', aliceDeleteBobTask.status === 403, aliceDeleteBobTask);
+    // 8. delete user with no tasks
+    const bobDeleteUser = await request('DELETE', `/user/${bob.data.id}`, { token: bobToken });
+    check('DELETE /user (no tasks) -> 204', bobDeleteUser.status === 204, bobDeleteUser);
 
-    await request('DELETE', `/task/${bobTask.data.id}`, { token: bobLogin.data.accessToken });
-    const bobDeleteUser = await request('DELETE', `/user/${bob.data.id}`, { token: bobLogin.data.accessToken });
-    check('DELETE /user (het task) -> 204', bobDeleteUser.status === 204, bobDeleteUser);
-
+    // 9. routing errors
     const wrongMethod = await request('PUT', '/tasks', { token });
     check('PUT /tasks -> 405', wrongMethod.status === 405, wrongMethod);
 

@@ -14,7 +14,7 @@ async function createTask(ctx) {
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   const description = typeof body.description === 'string' ? body.description : '';
 
-  if (!title) return sendError(res, 400, 'title la bat buoc');
+  if (!title) return sendError(res, 400, 'title is required');
 
   // owner comes from the token, not the client body -> prevents spoofing
   const task = store.tasks.create({ title, description, userId: user.id });
@@ -26,15 +26,20 @@ async function listTasks(ctx) {
 }
 
 async function assignTask(ctx) {
-  const { res, params, user } = ctx;
+  const { res, params, body } = ctx;
   const id = parseId(params.id);
+  if (!id) return sendError(res, 400, 'Invalid task id');
 
-  if (!id) return sendError(res, 400, 'id khong hop le');
+  // target owner comes from the request body (assign to another user)
+  const userId = parseId(body.user_id);
+  if (!userId) return sendError(res, 400, 'user_id must be a positive integer');
 
   const task = store.tasks.byId(id);
-  if (!task) return sendError(res, 404, 'Khong tim thay task');
+  if (!task) return sendError(res, 404, 'Task not found');
 
-  const updated = store.tasks.assign(id, user.id);
+  if (!store.users.byId(userId)) return sendError(res, 404, 'Target user not found');
+
+  const updated = store.tasks.assign(id, userId);
   return sendJson(res, 200, updated);
 }
 
@@ -42,11 +47,11 @@ async function deleteTask(ctx) {
   const { res, params, user } = ctx;
   const id = parseId(params.id);
 
-  if (!id) return sendError(res, 400, 'id khong hop le');
+  if (!id) return sendError(res, 400, 'Invalid task id');
 
   const task = store.tasks.byId(id);
-  if (!task) return sendError(res, 404, 'Khong tim thay task');
-  if (task.user_id !== user.id) return sendError(res, 403, 'Ban khong so huu task nay'); // only delete tasks you own
+  if (!task) return sendError(res, 404, 'Task not found');
+  if (task.user_id !== user.id) return sendError(res, 403, 'You do not own this task'); // only delete tasks you own
 
   store.tasks.remove(id);
   return sendNoContent(res);

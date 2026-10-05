@@ -28,7 +28,7 @@ function readBody(req) {
     req.on('data', (chunk) => {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        const error = new Error('Payload qua lon');
+        const error = new Error('Payload too large');
         error.status = 413; // read by index.js to map to an HTTP code
         reject(error);
         req.destroy(); // destroy the connection, stop reading
@@ -42,7 +42,7 @@ function readBody(req) {
       try {
         resolve(JSON.parse(raw));
       } catch {
-        const error = new Error('Body khong phai JSON hop le');
+        const error = new Error('Body is not valid JSON');
         error.status = 400;
         reject(error);
       }

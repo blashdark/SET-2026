@@ -29,9 +29,9 @@ const server = http.createServer(async (req, res) => {
 
     if (!route) {
       if (router.pathExists(url.pathname)) {
-        return sendError(res, 405, `Phuong thuc ${req.method} khong duoc ho tro cho ${url.pathname}`); // path exists but method is wrong
+        return sendError(res, 405, `Method ${req.method} not allowed for ${url.pathname}`); // path exists but method is wrong
       }
-      return sendError(res, 404, `Khong tim thay ${url.pathname}`); // path does not exist
+      return sendError(res, 404, `Not found: ${url.pathname}`); // path does not exist
     }
 
     let body = {};
@@ -45,14 +45,14 @@ const server = http.createServer(async (req, res) => {
       const token = extractBearer(req.headers.authorization);
       const payload = token ? verifyToken(token) : null;
       user = payload ? store.users.byId(payload.sub) : null;
-      if (!user) return sendError(res, 401, 'Chua xac thuc hoac token khong hop le');
+      if (!user) return sendError(res, 401, 'Unauthenticated or invalid token');
     }
 
     const ctx = { req, res, url, params: route.params, body, user };
     await route.handler(ctx);
   } catch (error) {
     if (res.headersSent) return res.end(); // response already started -> cannot write error headers
-    return sendError(res, error.status || 500, error.message || 'Loi he thong');
+    return sendError(res, error.status || 500, error.message || 'Internal server error');
   }
 });
 

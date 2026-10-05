@@ -78,13 +78,13 @@ Authorization: Bearer <accessToken>
 | 4 | DELETE | `/user/:id` | Co | Xoa user theo id |
 | 5 | POST | `/task` | Co | Tao task |
 | 6 | GET | `/tasks` | Co | Lay task cua chinh minh |
-| 7 | PATCH | `/assign-task/:id` | Co | Gan task (theo id) cho chinh minh |
+| 7 | PATCH | `/assign-task/:id` | Co | Gan task (theo id) cho user khac |
 | 8 | DELETE | `/task/:id` | Co | Xoa task cua chinh minh |
 
 ### Quy tac nghiep vu
 
 - `GET /tasks` chi tra ve task thuoc user dang dang nhap.
-- `PATCH /assign-task/:id` khong phan quyen (theo yeu cau bai tap), luon gan task cho chinh nguoi dang dang nhap.
+- `PATCH /assign-task/:id` khong phan quyen (theo yeu cau bai tap); body `{ "user_id": <id> }` doi chu so huu cua task sang user do (`400` neu thieu/sai `user_id`, `404` neu task hoac user dich khong ton tai).
 - `DELETE /task/:id` chi xoa duoc task minh so huu (neu khong -> `403`).
 - `DELETE /user/:id` bi chan (`409`) neu user con task; audit khong phan quyen (bat ky user da dang nhap deu xoa duoc user khac).
 
@@ -124,8 +124,11 @@ curl -X POST http://localhost:3000/task \
 # 5. Lay task cua minh
 curl http://localhost:3000/tasks -H "Authorization: Bearer $TOKEN"
 
-# 6. Gan task id=1 cho chinh minh
-curl -X PATCH http://localhost:3000/assign-task/1 -H "Authorization: Bearer $TOKEN"
+# 6. Gan task id=1 cho user id=2
+curl -X PATCH http://localhost:3000/assign-task/1 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":2}'
 
 # 7. Xoa task id=1 (neu minh so huu)
 curl -X DELETE http://localhost:3000/task/1 -H "Authorization: Bearer $TOKEN"

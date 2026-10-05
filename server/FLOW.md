@@ -184,7 +184,7 @@ Mỗi file export `register(router)` để gắn handler vào router. Handler l�
 
 - `POST /task` → `createTask`: cần `title`; tạo task với `user_id = ctx.user.id` → `201`.
 - `GET /tasks` → `listTasks`: trả `tasks.byUser(ctx.user.id)`.
-- `PATCH /assign-task/:id` → `assignTask`: tìm task (`404`), gán `user_id = ctx.user.id` → `200` (không kiểm tra sở hữu — đúng yêu cầu bài tập).
+- `PATCH /assign-task/:id` → `assignTask`: tìm task (`404`), gán `user_id = body.user_id` → `200` (không kiểm tra sở hữu — đúng yêu cầu bài tập).
 - `DELETE /task/:id` → `deleteTask`: tìm task (`404`), nếu `task.user_id !== ctx.user.id` → `403`, ngược lại xoá → `204`.
 
 ## 11. Bảng tra endpoint → handler → file
@@ -483,10 +483,11 @@ Helper chuyển chuỗi → id nguyên dương, sai trả `null`. Dùng chung ch
 
 `store.tasks.byUser(ctx.user.id)` — **chỉ task của chính mình**.
 
-### `assignTask(ctx)` (26–37)
+### `assignTask(ctx)`
 
-- Validate id; task không tồn tại → `404`.
-- `store.tasks.assign(id, user.id)` — **gán cho chính người đang đăng nhập** (không lấy userId từ body), đúng yêu cầu "không phân quyền".
+- Validate `:id` (task) và `body.user_id` (user đích) → `400` nếu thiếu/sai.
+- Task không tồn tại → `404`; user đích không tồn tại → `404`.
+- `store.tasks.assign(id, userId)` — **đổi chủ sở hữu sang user trong body** (không kiểm tra sở hữu của người gọi, theo yêu cầu "không phân quyền").
 - `200` + task đã cập nhật.
 
 ### `deleteTask(ctx)` (39–51)

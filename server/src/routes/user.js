@@ -12,13 +12,13 @@ async function removeUser(ctx) {
   const { res, params } = ctx;
   const id = Number(params.id);
 
-  if (!Number.isInteger(id) || id <= 0) return sendError(res, 400, 'id khong hop le');
+  if (!Number.isInteger(id) || id <= 0) return sendError(res, 400, 'Invalid user id');
 
   const target = store.users.byId(id);
-  if (!target) return sendError(res, 404, 'Khong tim thay user');
+  if (!target) return sendError(res, 404, 'User not found');
 
   if (store.tasks.countByUser(id) > 0) {
-    return sendError(res, 409, 'User van con task, khong the xoa'); // block deletion while tasks remain
+    return sendError(res, 409, 'User still has tasks and cannot be deleted'); // block deletion while tasks remain
   }
 
   store.users.remove(id);
