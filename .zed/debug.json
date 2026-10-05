@@ -1,0 +1,20 @@
+[
+  {
+    "label": "Debug server (index.js)",
+    "adapter": "JavaScript",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/server/index.js",
+    "cwd": "$ZED_WORKTREE_ROOT/server",
+    "console": "integratedTerminal",
+    "env": {
+      "PORT": "3000",
+      "JWT_SECRET": "dev-secret-change-me"
+    }
+  },
+  {
+    "label": "Attach to Node (port 9229)",
+    "adapter": "JavaScript",
+    "request": "attach",
+    "port": 9229
+  }
+]
