@@ -10,7 +10,7 @@ REST API xac thuc nguoi dung (access token) va quan ly task, viet bang **Node.js
 
 ```bash
 cd server
-node src/index.js
+node index.js
 # hoac
 npm start
 # dev (tu dong reload khi sua file)
@@ -24,7 +24,7 @@ Mac dinh server chay o `http://localhost:3000`.
 Chep `.env.example` thanh `.env` roi chinh sua, sau do chay:
 
 ```bash
-node --env-file=.env src/index.js
+node --env-file=.env index.js
 ```
 
 | Bien | Mac dinh | Mo ta |
@@ -95,8 +95,7 @@ Authorization: Bearer <accessToken>
 | 400 | Du lieu khong hop le |
 | 401 | Chua xac thuc / sai dang nhap / token het han |
 | 403 | Khong so huu tai nguyen |
-| 404 | Khong tim thay |
-| 405 | Sai method cho path |
+| 404 | Khong tim thay (hoac sai method cho path) |
 | 409 | Xung dot (username trung, user con task) |
 
 ## Vi du voi cURL
@@ -141,16 +140,12 @@ curl -X DELETE http://localhost:3000/user/1 -H "Authorization: Bearer $TOKEN"
 
 ```
 server/
-  src/
-    index.js         # entry: tao http server, dispatch, xac thuc
-    router.js        # router nho ho tro /:id
-    http.js          # helper JSON / doc body
-    auth.js          # hash password (scrypt) + ky/verify access token (HMAC)
-    csv.js           # parse / ghi CSV
-    store.js         # doc ghi users.csv, tasks.csv
-    routes/
-      auth.js        # POST /sign-up, POST /login
-      user.js        # GET /me, DELETE /user/:id
-      task.js        # POST /task, GET /tasks, PATCH /assign-task/:id, DELETE /task/:id
-  data/              # CSV (tu dong tao, khong commit)
+  index.js       # entry: http server + routing + handlers
+  store.js       # doc/ghi users.csv, tasks.csv
+  auth.js        # hash password (scrypt) + ky/verify access token (HMAC)
+  test/
+    smoke.js     # smoke test toan bo endpoint
+  data/          # CSV (tu dong tao, khong commit)
 ```
+
+> code gon, de doc: routing dung if/else theo method + path, khong dung framework/abstraction.

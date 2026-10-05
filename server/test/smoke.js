@@ -60,7 +60,7 @@ function waitForServer() {
 }
 
 async function main() {
-  const server = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'index.js')], { // child_process.spawn: launch the server process
+  const server = spawn(process.execPath, [path.join(__dirname, '..', 'index.js')], { // child_process.spawn: launch the server process
     env: { ...process.env, PORT: String(PORT), DATA_DIR, JWT_SECRET: 'test-secret' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -141,7 +141,7 @@ async function main() {
 
     // 9. routing errors
     const wrongMethod = await request('PUT', '/tasks', { token });
-    check('PUT /tasks -> 405', wrongMethod.status === 405, wrongMethod);
+    check('PUT /tasks (unsupported method) -> 404', wrongMethod.status === 404, wrongMethod);
 
     const notFound = await request('GET', '/nope', { token });
     check('GET /nope -> 404', notFound.status === 404, notFound);
