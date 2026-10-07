@@ -1,9 +1,9 @@
 # Hướng dẫn đặt breakpoint & debug
 
-Hướng dẫn debug server trong `server/` (Node.js core). Có 2 tiến trình liên quan:
+Hướng dẫn debug server trong `backend/` (Node.js core). Có 2 tiến trình liên quan:
 
-- `server/index.js` — bản thân server.
-- `server/test/smoke.js` — chạy server dưới dạng **tiến trình con** (`child_process.spawn`).
+- `backend/index.js` — bản thân server.
+- `backend/test/smoke.js` — chạy server dưới dạng **tiến trình con** (`child_process.spawn`).
 
 > Điểm quan trọng: breakpoint trong `index.js` sẽ **không dừng** khi bạn chạy `test/smoke.js` bằng debugger, vì code chạy ở tiến trình con. Xem mục 4.
 
@@ -86,7 +86,7 @@ Khi dừng, panel cho bạn: **Variables** (biến local), **Call Stack**, **Wat
 ## 3. Không dùng Zed: `--inspect` + Chrome DevTools
 
 ```bash
-cd server
+cd backend
 node --inspect index.js        # mở cổng inspector
 node --inspect-brk index.js    # dừng ngay dòng đầu
 node --watch --inspect index.js  # vừa code vừa reload
@@ -119,8 +119,8 @@ Mở Chrome → `chrome://inspect` → **Open dedicated DevTools for Node** → 
       "type": "node",
       "request": "launch",
       "name": "Debug server",
-      "program": "${workspaceFolder}/server/index.js",
-      "cwd": "${workspaceFolder}/server",
+      "program": "${workspaceFolder}/backend/index.js",
+      "cwd": "${workspaceFolder}/backend",
       "env": { "PORT": "3000" }
     }
   ]
@@ -129,6 +129,6 @@ Mở Chrome → `chrome://inspect` → **Open dedicated DevTools for Node** → 
 
 ## 6. Lưu ý riêng của server này
 
-- **Token stateless + CSV ghi file**: debugger chạy code thật nên request sẽ **ghi vào CSV**. Muốn dữ liệu sạch, đặt `DATA_DIR` trong `env` trỏ tới thư mục tạm, hoặc xoá `server/data/*.csv`.
+- **Token stateless + CSV ghi file**: debugger chạy code thật nên request sẽ **ghi vào CSV**. Muốn dữ liệu sạch, đặt `DATA_DIR` trong `env` trỏ tới thư mục tạm, hoặc xoá `backend/data/*.csv`.
 - **Port bị chiếm**: đổi `PORT` trong `env` cấu hình debug khi chạy song song bản thường.
 - **Sửa code xong**: `node --watch` (hoặc `npm run dev`) tự reload, nhưng **không** giữ breakpoint như debugger — muốn debug thì dùng cấu hình launch.

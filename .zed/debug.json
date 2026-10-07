@@ -4,8 +4,8 @@
     "adapter": "JavaScript",
     "type": "pwa-node",
     "request": "launch",
-    "program": "$ZED_WORKTREE_ROOT/server/index.js",
-    "cwd": "$ZED_WORKTREE_ROOT/server",
+    "program": "$ZED_WORKTREE_ROOT/backend/index.js",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
     "console": "integratedTerminal",
     "env": {
       "PORT": "3000",
