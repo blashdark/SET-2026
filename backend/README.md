@@ -9,7 +9,7 @@ REST API xac thuc nguoi dung (access token) va quan ly task, viet bang **Node.js
 ## Chay server
 
 ```bash
-cd server
+cd backend
 node index.js
 # hoac
 npm start
@@ -35,7 +35,7 @@ node --env-file=.env index.js
 
 ## Database
 
-Luu trong `server/data/` (tu dong tao khi chay, bi `.gitignore` bo qua):
+Luu trong `backend/data/` (tu dong tao khi chay, bi `.gitignore` bo qua):
 
 `users.csv`
 
@@ -139,7 +139,7 @@ curl -X DELETE http://localhost:3000/user/1 -H "Authorization: Bearer $TOKEN"
 ## Cau truc
 
 ```
-server/
+backend/
   index.js       # entry: http server + routing + handlers
   store.js       # doc/ghi users.csv, tasks.csv
   auth.js        # hash password (scrypt) + ky/verify access token (HMAC)

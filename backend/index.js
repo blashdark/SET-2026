@@ -132,6 +132,15 @@ const server = http.createServer(async (req, res) => { // called for every reque
   const { method } = req;
   const path = req.url.split('?')[0]; // drop the query string
 
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (method === 'OPTIONS') {
+    res.writeHead(204);
+    return res.end();
+  }
+
   try {
     // Public routes.
     if (method === 'POST' && path === '/sign-up') return signUp(res, await readBody(req));

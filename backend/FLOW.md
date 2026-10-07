@@ -5,7 +5,7 @@ Tài liệu này giải thích server khởi động thế nào, một request �
 ## 1. Cây file
 
 ```
-server/
+backend/
   index.js    # entry: tạo HTTP server, routing (if/else), tất cả handler
   store.js    # lớp dữ liệu: đọc/ghi CSV, truy vấn users/tasks
   auth.js     # hash password (scrypt) + tạo/kiểm tra access token (HMAC)
