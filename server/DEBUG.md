@@ -11,12 +11,31 @@ Hướng dẫn debug server trong `server/` (Node.js core). Có 2 tiến trình 
 
 ### 1.1 Cấu hình
 
-Zed dùng giao thức DAP, cần file `.zed/debug.json` ở gốc project (đã tạo sẵn). Có 2 cấu hình:
+Zed dùng giao thức DAP. Cấu hình nằm ở `.zed/debug.json` (gốc project, đã tạo sẵn) với 2 session:
 
 - **Debug server (index.js)** — chạy server dưới debugger.
 - **Attach to Node (port 9229)** — gắn vào tiến trình đang chạy `node --inspect`.
 
-Nếu adapter `JavaScript` không có sẵn, cài extension **JavaScript Debugger** (Zed dùng `vscode-js-debug` bên dưới), hoặc mở **Debug panel → New Debug Session** để Zed tự sinh cấu hình.
+```json
+[
+  {
+    "label": "Debug server (index.js)",
+    "adapter": "JavaScript",
+    "type": "pwa-node",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/server/index.js",
+    "cwd": "$ZED_WORKTREE_ROOT/server",
+    "console": "integratedTerminal",
+    "env": { "PORT": "3000", "JWT_SECRET": "dev-secret-change-me" }
+  }
+]
+```
+
+> **Quan trọng:** phải có `"type": "pwa-node"`. Thiếu `type` → js-debug báo `Error: Unknown config: {...}` ngay khi start. `"type": "node"` cũng thường chấp nhận được.
+
+**Cách khác (không cần tự viết config):** JavaScript có tính năng *automatic scenario creation*, nên có thể bấm **F4** (`debugger: start`) → chọn entry point `server/index.js` → Zed tự sinh cấu hình đúng. Khi đó có thể xoá `.zed/debug.json` để Zed không ưu tiên file này (Zed ưu tiên `.zed/debug.json` hơn `.vscode/launch.json`).
+
+Nếu adapter `JavaScript` không có sẵn, cài extension **JavaScript Debugger** (Zed dùng `vscode-js-debug` bên dưới).
 
 ### 1.2 Đặt breakpoint
 
