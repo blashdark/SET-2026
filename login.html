@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Login Test - DummyJSON Auth</title>
+  <style>
+    body { font-family: monospace; margin: 20px; }
+    form { margin-bottom: 20px; }
+    input { display: block; margin-bottom: 8px; }
+    button { margin-right: 8px; }
+    pre { background: #f0f0f0; padding: 10px;}
+  </style>
+</head>
+<body>
+  <h1>DummyJSON Auth Test</h1>
+
+  <form id="loginForm">
+    <label>Username: <input id="username" value="emilys" /></label>
+    <label>Password: <input id="password" type="password" value="emilyspass" /></label>
+    <button type="submit">Login</button>
+  </form>
+
+  <button id="btnMe">GET /auth/me</button>
+  <button id="btnRefresh">POST /auth/refresh</button>
+  <button id="btnClear">Clear log</button>
+</body>
+</html>
