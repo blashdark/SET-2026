@@ -4,7 +4,7 @@
     "adapter": "JavaScript",
     "type": "pwa-node",
     "request": "launch",
-    "program": "$ZED_WORKTREE_ROOT/backend/index.js",
+    "program": "$ZED_WORKTREE_ROOT/backend/src/index.js",
     "cwd": "$ZED_WORKTREE_ROOT/backend",
     "console": "integratedTerminal",
     "env": {
