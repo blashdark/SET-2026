@@ -1,401 +1,290 @@
 'use strict';
 
-// Self-built datastore: NO database engine — just CSV files we read/write
-// ourselves. Reads come from in-memory indexes (Maps). Writes mutate memory and
-// mark the file dirty; flush() rewrites the file as a SNAPSHOT, so the CSV holds
-// exactly ONE line per user/task (no append log, no duplicate rows).
+// Self-built datastore: NO database engine. Rows are FIXED-LENGTH CSV records:
+// every row is the SAME number of bytes, so row N starts at offset N * ROW and
+// can be located by arithmetic and rewritten IN PLACE (no garbage, no compaction).
+//
+// Only small indexes live in RAM (email -> id, verify-token -> id, tasks per user);
+// the row data itself stays on disk and is read on demand. id = slot + 1, and a
+// deleted row is marked free (its slot is never reused, so ids never collide).
 
 const fs = require('fs'); // node:fs built-in
-const fsp = require('fs').promises;
 const path = require('path'); // node:path built-in
-const { StringDecoder } = require('string_decoder'); // keeps partial multibyte chars across chunks
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.csv');
 const TASKS_FILE = path.join(DATA_DIR, 'tasks.csv');
 
-// Snapshot header: one row = current state of one entity.
-const USERS_HEADER = ['id', 'email', 'password_hash', 'salt', 'status', 'verify_token', 'verify_expires', 'created_at'];
-const TASKS_HEADER = ['id', 'title', 'done', 'user_id', 'created_by', 'created_at'];
+// [field name, width in BYTES]. Cells are space-padded; ',' separates fields; the
+// row ends with '\n'. Row length = sum(widths) + one separator byte per field.
+const USERS_LAYOUT = [
+  ['email', 64],
+  ['password_hash', 128],
+  ['salt', 32],
+  ['status', 8],
+  ['verify_token', 64],
+  ['verify_expires', 13],
+  ['created_at', 24]
+];
+const TASKS_LAYOUT = [
+  ['title', 128],
+  ['alive', 1],
+  ['done', 1],
+  ['user_id', 10],
+  ['created_by', 10],
+  ['created_at', 24]
+];
 
-const FLUSH_MS = Number(process.env.FLUSH_MS || 200); // write-behind interval
+const rowSize = (layout) => layout.reduce((n, [, width]) => n + width + 1, 0);
+const USERS_ROW = rowSize(USERS_LAYOUT); // 340
+const TASKS_ROW = rowSize(TASKS_LAYOUT); // 180
 
-// ---------- CSV helpers ----------
+// User input must fit its cell; index.js rejects longer values with a 400.
+const MAX_EMAIL_BYTES = USERS_LAYOUT[0][1]; // 64
+const MAX_TITLE_BYTES = TASKS_LAYOUT[0][1]; // 128
 
-// Quote a value when it holds a delimiter, a quote or a line break.
-function escapeValue(value) {
-  const text = String(value ?? '');
-  return /[",\r\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+// ---------- row codec (fixed-length, byte-based) ----------
+
+function encodeRow(layout, data) {
+  const parts = [];
+  layout.forEach(([name, width], i) => {
+    const bytes = Buffer.from(String(data[name] ?? ''), 'utf8');
+    if (bytes.length > width) throw new Error(`field '${name}' exceeds ${width} bytes`);
+    const cell = Buffer.alloc(width, 0x20); // pad with spaces
+    bytes.copy(cell);
+    parts.push(cell, Buffer.from(i === layout.length - 1 ? '\n' : ','));
+  });
+  return Buffer.concat(parts);
 }
 
-// Parse a single CSV line (no embedded newlines). Kept as a standalone helper.
-function splitLine(line) {
-  const fields = [];
-  let value = '';
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (quoted) {
-      if (ch === '"' && line[i + 1] === '"') { value += '"'; i += 1; }
-      else if (ch === '"') quoted = false;
-      else value += ch;
-    } else if (ch === '"') quoted = true;
-    else if (ch === ',') { fields.push(value); value = ''; }
-    else value += ch;
+// Slice by BYTE position (never split on ','), so a value may safely contain a comma.
+function decodeRow(layout, buf) {
+  const data = {};
+  let pos = 0;
+  for (const [name, width] of layout) {
+    data[name] = buf.toString('utf8', pos, pos + width).replace(/ +$/, ''); // trim padding
+    pos += width + 1; // skip the 1-byte separator
   }
-  fields.push(value);
-  return fields;
+  return data;
 }
 
-function toCsvLine(header, obj) {
-  return header.map((key) => escapeValue(obj[key])).join(',');
+// ---------- files ----------
+
+function openFile(file) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!fs.existsSync(file)) fs.writeFileSync(file, ''); // create empty
+  return fs.openSync(file, 'r+'); // read + in-place write
 }
 
-// ---------- in-memory indexes ----------
+const usersFd = openFile(USERS_FILE);
+const tasksFd = openFile(TASKS_FILE);
 
-const usersById = new Map();
-const usersByEmail = new Map();
-const usersByToken = new Map();
-let nextUserId = 1;
+function readRow(fd, layout, size, index) {
+  const buf = Buffer.alloc(size);
+  const n = fs.readSync(fd, buf, 0, size, index * size);
+  return n === size ? decodeRow(layout, buf) : null; // short read -> past EOF
+}
 
-const tasksById = new Map();
-const tasksByUser = new Map(); // userId -> Set(taskId)
-let nextTaskId = 1;
+function writeRow(fd, layout, size, index, data) {
+  fs.writeSync(fd, encodeRow(layout, data), 0, size, index * size); // in place, or append past EOF
+}
+
+// ---------- in-RAM indexes (no row data) ----------
 
 const normalizeEmail = (email) => String(email ?? '').trim().toLowerCase();
-const toBool = (v) => v === true || v === 'true' || v === 1 || v === '1';
-const toNumOrNull = (v) => (v === '' || v === null || v === undefined ? null : Number(v));
+const toBool = (v) => v === true || v === '1';
+const toNumOrNull = (v) => (v === '' || v == null ? null : Number(v));
 
-// ---------- load ----------
-// Understands both formats:
-//   * snapshot (current): header + one row per entity
-//   * legacy append-log:  first column "op" (add | patch | del)
-// so an old users.csv is read correctly, then rewritten as a snapshot on flush.
-//
-// The parser is a stateful CSV reader: it tracks quote state ACROSS newlines (so
-// a quoted value containing \n is kept whole) and decodes chunks with a
-// StringDecoder (so a UTF-8 char split at a 1 MiB boundary is not corrupted).
+const emailToId = new Map(); // email -> user id
+const tokenToId = new Map(); // verify token -> user id
+const tasksByUser = new Map(); // user id -> Set(task id)
+let userCount = 0;
+let taskCount = 0;
+let usersSlots = 0; // rows present in users.csv (including free)
+let tasksSlots = 0;
+let nextUserId = 1;
+let nextTaskId = 1;
 
-function loadCsv(file, apply) {
-  if (!fs.existsSync(file)) return { log: false, rows: 0 };
+// ---------- load: build indexes by scanning the file (rows stay on disk) ----------
 
-  const fd = fs.openSync(file, 'r');
-  const buf = Buffer.alloc(1 << 20); // 1MB chunks -> don't load a huge file at once
-  const decoder = new StringDecoder('utf8');
-
-  let headerKeys = null;
-  let isLog = false;
-  let rows = 0;
-  let fields = [];
-  let field = '';
-  let quoted = false;
-
-  const endRow = () => {
-    // skip blank lines (a line that yields a single empty field)
-    if (fields.length === 1 && fields[0] === '') { fields = []; field = ''; return; }
-    if (!headerKeys) {
-      headerKeys = fields;
-      isLog = fields[0] === 'op';
-    } else {
-      const row = {};
-      headerKeys.forEach((key, i) => { row[key] = fields[i] ?? ''; });
-      rows += 1;
-      apply(row, isLog);
+function loadUsers() {
+  const CHUNK = 512; // rows per read
+  const buf = Buffer.alloc(USERS_ROW * CHUNK);
+  let base = 0;
+  for (;;) {
+    const bytes = fs.readSync(usersFd, buf, 0, buf.length, base * USERS_ROW);
+    const rows = Math.floor(bytes / USERS_ROW);
+    for (let r = 0; r < rows; r += 1) {
+      const off = r * USERS_ROW;
+      const row = decodeRow(USERS_LAYOUT, buf.subarray(off, off + USERS_ROW));
+      if (row.status === 'free') continue;
+      emailToId.set(normalizeEmail(row.email), base + r + 1);
+      if (row.verify_token) tokenToId.set(row.verify_token, base + r + 1);
+      userCount += 1;
     }
-    fields = [];
-    field = '';
-  };
+    base += rows;
+    if (bytes < buf.length) break;
+  }
+  usersSlots = base;
+  nextUserId = base + 1;
+}
 
-  const feed = (text) => {
-    for (let i = 0; i < text.length; i += 1) {
-      const ch = text[i];
-      if (quoted) {
-        if (ch === '"') {
-          if (text[i + 1] === '"') { field += '"'; i += 1; } // escaped quote
-          else quoted = false; // closing quote
-        } else {
-          field += ch; // ',' and '\n' are literal while inside quotes
-        }
-      } else if (ch === '"') {
-        quoted = true;
-      } else if (ch === ',') {
-        fields.push(field); field = '';
-      } else if (ch === '\n') {
-        fields.push(field); field = '';
-        endRow();
-      } else if (ch !== '\r') { // drop stray CR (CRLF and lone CR both tolerated)
-        field += ch;
+function loadTasks() {
+  const CHUNK = 512;
+  const buf = Buffer.alloc(TASKS_ROW * CHUNK);
+  let base = 0;
+  for (;;) {
+    const bytes = fs.readSync(tasksFd, buf, 0, buf.length, base * TASKS_ROW);
+    const rows = Math.floor(bytes / TASKS_ROW);
+    for (let r = 0; r < rows; r += 1) {
+      const off = r * TASKS_ROW;
+      const row = decodeRow(TASKS_LAYOUT, buf.subarray(off, off + TASKS_ROW));
+      if (row.alive !== '1') continue;
+      taskCount += 1;
+      const id = base + r + 1;
+      const userId = toNumOrNull(row.user_id);
+      if (userId !== null) {
+        if (!tasksByUser.has(userId)) tasksByUser.set(userId, new Set());
+        tasksByUser.get(userId).add(id);
       }
     }
-  };
-
-  for (;;) {
-    const bytes = fs.readSync(fd, buf, 0, buf.length, null);
-    if (bytes === 0) break;
-    feed(decoder.write(buf.subarray(0, bytes)));
+    base += rows;
+    if (bytes < buf.length) break;
   }
-  feed(decoder.end());
-  if (field !== '' || fields.length) { fields.push(field); field = ''; endRow(); } // last line without trailing newline
-  fs.closeSync(fd);
-  return { log: isLog, rows };
+  tasksSlots = base;
+  nextTaskId = base + 1;
 }
 
-function removeUserFromIndex(id) {
-  const existing = usersById.get(id);
-  if (!existing) return;
-  usersById.delete(id);
-  if (usersByEmail.get(existing.email) === existing) usersByEmail.delete(existing.email);
-  if (existing.verify_token && usersByToken.get(existing.verify_token) === existing) usersByToken.delete(existing.verify_token);
-}
-
-function applyUserRow(row, isLog) {
-  const id = Number(row.id);
-  if (isLog && row.op === 'del') { removeUserFromIndex(id); return; }
-
-  const user = {
-    id,
-    email: normalizeEmail(row.email), // normalize on load so the email index keys agree
-    password_hash: row.password_hash,
-    salt: row.salt,
-    status: row.status,
-    verify_token: row.verify_token === '' ? null : row.verify_token,
-    verify_expires: row.verify_expires === '' ? null : Number(row.verify_expires),
-    created_at: row.created_at
-  };
-  removeUserFromIndex(id); // handle re-add / email change
-  usersById.set(id, user);
-  usersByEmail.set(user.email, user);
-  if (user.verify_token) usersByToken.set(user.verify_token, user);
-  if (id >= nextUserId) nextUserId = id + 1;
-}
-
-function removeTaskFromIndex(id) {
-  const existing = tasksById.get(id);
-  if (!existing) return;
-  tasksById.delete(id);
-  const set = existing.user_id !== null ? tasksByUser.get(existing.user_id) : null;
-  if (set) { set.delete(id); if (!set.size) tasksByUser.delete(existing.user_id); }
-}
-
-function applyTaskRow(row, isLog) {
-  const id = Number(row.id);
-  if (isLog && row.op === 'del') { removeTaskFromIndex(id); return; }
-
-  const task = {
-    id,
-    title: row.title,
-    done: toBool(row.done),
-    user_id: toNumOrNull(row.user_id),
-    created_by: toNumOrNull(row.created_by),
-    created_at: row.created_at
-  };
-  removeTaskFromIndex(id);
-  tasksById.set(id, task);
-  if (task.user_id !== null) {
-    if (!tasksByUser.has(task.user_id)) tasksByUser.set(task.user_id, new Set());
-    tasksByUser.get(task.user_id).add(id);
-  }
-  if (id >= nextTaskId) nextTaskId = id + 1;
-}
-
-const usersLoad = loadCsv(USERS_FILE, applyUserRow);
-const tasksLoad = loadCsv(TASKS_FILE, applyTaskRow);
-
-// ---------- persistence: rewrite a snapshot (one line per entity) ----------
-
-let usersDirty = false;
-let tasksDirty = false;
-let flushTimer = null;
-let flushing = false;
-let flushBackoff = 0; // grows on repeated failures so a broken disk doesn't spin
-
-function rowForUser(user) {
-  return toCsvLine(USERS_HEADER, {
-    id: user.id,
-    email: user.email,
-    password_hash: user.password_hash,
-    salt: user.salt,
-    status: user.status,
-    verify_token: user.verify_token ?? '',
-    verify_expires: user.verify_expires ?? '',
-    created_at: user.created_at
-  });
-}
-
-function rowForTask(task) {
-  return toCsvLine(TASKS_HEADER, {
-    id: task.id,
-    title: task.title,
-    done: task.done ? 1 : 0,
-    user_id: task.user_id ?? '',
-    created_by: task.created_by ?? '',
-    created_at: task.created_at
-  });
-}
-
-function snapshot(header, items, rowFn) {
-  const parts = [header.join(',')];
-  for (const item of items) parts.push(rowFn(item));
-  return parts.join('\n') + '\n';
-}
-
-function scheduleFlush(delay = FLUSH_MS) {
-  if (flushTimer) return;
-  flushTimer = setTimeout(flush, delay);
-  if (flushTimer.unref) flushTimer.unref();
-}
-
-function markUsersDirty() { usersDirty = true; scheduleFlush(); }
-function markTasksDirty() { tasksDirty = true; scheduleFlush(); }
-
-// Write one file atomically (tmp + rename). Dirty is cleared by the caller on success.
-async function writeSnapshot(file, data) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = file + '.tmp';
-  await fsp.writeFile(tmp, data);
-  await fsp.rename(tmp, file); // atomic replace -> readers never see a half file
-}
-
-// Async flush (used by the timer): does not block the event loop on disk I/O.
-// Dirty flags are cleared only AFTER a successful write, so a failed flush is
-// retried (with backoff) instead of silently dropping the pending snapshot.
-async function flush() {
-  flushTimer = null;
-  if (flushing) return; // the running flush will pick up the dirty flags again
-  if (!usersDirty && !tasksDirty) return;
-
-  flushing = true;
-  let failed = false;
-  try {
-    if (usersDirty) { await writeSnapshot(USERS_FILE, snapshot(USERS_HEADER, usersById.values(), rowForUser)); usersDirty = false; }
-    if (tasksDirty) { await writeSnapshot(TASKS_FILE, snapshot(TASKS_HEADER, tasksById.values(), rowForTask)); tasksDirty = false; }
-  } catch (err) {
-    failed = true;
-    console.error('[store] flush failed:', err.message);
-  }
-  flushing = false;
-
-  if (failed) {
-    flushBackoff = flushBackoff ? Math.min(flushBackoff * 2, 30000) : FLUSH_MS * 2;
-    scheduleFlush(flushBackoff); // retry, still holding the dirty data
-  } else {
-    flushBackoff = 0;
-    if (usersDirty || tasksDirty) scheduleFlush(); // mutations that landed mid-write
-  }
-}
-
-// Synchronous flush for process exit (async I/O can't run during 'exit').
-function flushSync() {
-  try {
-    if (usersDirty) {
-      fs.mkdirSync(path.dirname(USERS_FILE), { recursive: true });
-      fs.writeFileSync(USERS_FILE, snapshot(USERS_HEADER, usersById.values(), rowForUser));
-      usersDirty = false;
-    }
-    if (tasksDirty) {
-      fs.mkdirSync(path.dirname(TASKS_FILE), { recursive: true });
-      fs.writeFileSync(TASKS_FILE, snapshot(TASKS_HEADER, tasksById.values(), rowForTask));
-      tasksDirty = false;
-    }
-  } catch (err) {
-    console.error('[store] flushSync failed:', err.message);
-  }
-}
-
-process.on('exit', flushSync);
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => { flushSync(); process.exit(0); });
-}
-
-// A legacy append-log (or extra rows) on disk -> compact to a snapshot now.
-if (usersLoad.log || usersLoad.rows !== usersById.size) markUsersDirty();
-if (tasksLoad.log || tasksLoad.rows !== tasksById.size) markTasksDirty();
+loadUsers();
+loadTasks();
 
 // ---------- users ----------
 
+function toUser(id, row) {
+  return {
+    id,
+    email: row.email,
+    password_hash: row.password_hash,
+    salt: row.salt,
+    status: row.status,
+    verify_token: row.verify_token || null,
+    verify_expires: row.verify_expires ? Number(row.verify_expires) : null,
+    created_at: row.created_at
+  };
+}
+
+function userRow(u) {
+  return {
+    email: u.email,
+    password_hash: u.password_hash,
+    salt: u.salt,
+    status: u.status,
+    verify_token: u.verify_token ?? '',
+    verify_expires: u.verify_expires ?? '',
+    created_at: u.created_at
+  };
+}
+
 function getUserById(id) {
-  return usersById.get(Number(id)) || null;
+  const index = Number(id) - 1;
+  if (!(index >= 0) || index >= usersSlots) return null;
+  const row = readRow(usersFd, USERS_LAYOUT, USERS_ROW, index);
+  if (!row || row.status === 'free') return null;
+  return toUser(index + 1, row);
 }
 
 function getUserByEmail(email) {
-  return usersByEmail.get(normalizeEmail(email)) || null;
+  const id = emailToId.get(normalizeEmail(email));
+  return id ? getUserById(id) : null;
 }
 
 function getUserByVerifyToken(token) {
-  return token ? usersByToken.get(String(token)) || null : null;
+  const id = token ? tokenToId.get(String(token)) : null;
+  return id ? getUserById(id) : null;
+}
+
+function putUser(id, row) {
+  writeRow(usersFd, USERS_LAYOUT, USERS_ROW, id - 1, row);
+  if (id > usersSlots) usersSlots = id;
 }
 
 function createUser({ email, passwordHash, salt, verifyToken = null, verifyExpires = null }) {
-  const user = {
-    id: nextUserId++,
+  const id = nextUserId++;
+  const row = {
     email: normalizeEmail(email),
     password_hash: passwordHash,
     salt,
     status: 'pending',
-    verify_token: verifyToken,
-    verify_expires: verifyExpires,
+    verify_token: verifyToken ?? '',
+    verify_expires: verifyExpires ?? '',
     created_at: new Date().toISOString()
   };
-  usersById.set(user.id, user);
-  usersByEmail.set(user.email, user);
-  if (user.verify_token) usersByToken.set(user.verify_token, user);
-  markUsersDirty();
-  return user;
+  putUser(id, row);
+  emailToId.set(row.email, id);
+  if (row.verify_token) tokenToId.set(row.verify_token, id);
+  userCount += 1;
+  return toUser(id, row);
 }
 
 function activateUser(id) {
-  const user = usersById.get(Number(id));
+  const user = getUserById(id);
   if (!user) return null;
-  if (user.verify_token) usersByToken.delete(user.verify_token);
+  if (user.verify_token) tokenToId.delete(user.verify_token);
   user.status = 'active';
   user.verify_token = null;
   user.verify_expires = null;
-  markUsersDirty();
+  putUser(user.id, userRow(user));
   return user;
 }
 
 function setVerifyToken(id, token, expiresAt) {
-  const user = usersById.get(Number(id));
+  const user = getUserById(id);
   if (!user) return null;
-  if (user.verify_token) usersByToken.delete(user.verify_token);
+  if (user.verify_token) tokenToId.delete(user.verify_token);
   user.verify_token = token;
   user.verify_expires = expiresAt;
-  if (token) usersByToken.set(token, user);
-  markUsersDirty();
+  if (token) tokenToId.set(token, user.id);
+  putUser(user.id, userRow(user));
   return user;
 }
 
 function setPasswordHash(id, passwordHash, salt) {
-  const user = usersById.get(Number(id));
+  const user = getUserById(id);
   if (!user) return null;
   user.password_hash = passwordHash;
   user.salt = salt;
-  markUsersDirty();
+  putUser(user.id, userRow(user));
   return user;
 }
 
 function deleteUser(id) {
-  const numericId = Number(id);
-  if (!usersById.has(numericId)) return;
-  removeUserFromIndex(numericId);
-  markUsersDirty();
+  const user = getUserById(id);
+  if (!user) return;
+  if (user.verify_token) tokenToId.delete(user.verify_token);
+  emailToId.delete(user.email);
+  const row = userRow(user);
+  row.status = 'free';
+  putUser(user.id, row);
+  userCount -= 1;
 }
 
-// Users are stored in insertion (≈ id) order, so skip/take is cheap.
+// Users are stored in id order, so skip/take is cheap (reads only what it returns).
 function listUsers(limit = 50, offset = 0) {
   const lim = Number(limit);
   let skip = Number(offset);
   const out = [];
-  for (const user of usersById.values()) {
+  for (let index = 0; index < usersSlots; index += 1) {
+    const row = readRow(usersFd, USERS_LAYOUT, USERS_ROW, index);
+    if (!row || row.status === 'free') continue;
     if (skip > 0) { skip -= 1; continue; }
-    out.push({ id: user.id, email: user.email, status: user.status, created_at: user.created_at });
+    out.push({ id: index + 1, email: row.email, status: row.status, created_at: row.created_at });
     if (out.length >= lim) break;
   }
   return out;
 }
 
 function countUsers() {
-  return usersById.size;
+  return userCount;
 }
 
 function countUserTasks(userId) {
@@ -405,94 +294,162 @@ function countUserTasks(userId) {
 
 // ---------- tasks ----------
 
+function toTask(id, row) {
+  return {
+    id,
+    title: row.title,
+    done: toBool(row.done),
+    user_id: toNumOrNull(row.user_id),
+    created_by: toNumOrNull(row.created_by),
+    created_at: row.created_at
+  };
+}
+
+function taskRow(t) {
+  return {
+    title: t.title,
+    alive: '1',
+    done: t.done ? '1' : '0',
+    user_id: t.user_id ?? '',
+    created_by: t.created_by ?? '',
+    created_at: t.created_at
+  };
+}
+
+function putTask(id, row) {
+  writeRow(tasksFd, TASKS_LAYOUT, TASKS_ROW, id - 1, row);
+  if (id > tasksSlots) tasksSlots = id;
+}
+
+function indexTask(id, userId) {
+  if (userId == null) return;
+  if (!tasksByUser.has(userId)) tasksByUser.set(userId, new Set());
+  tasksByUser.get(userId).add(id);
+}
+
+function unindexTask(id, userId) {
+  if (userId == null) return;
+  const set = tasksByUser.get(userId);
+  if (set) { set.delete(id); if (!set.size) tasksByUser.delete(userId); }
+}
+
 function findTaskById(id) {
-  return tasksById.get(Number(id)) || null;
+  const index = Number(id) - 1;
+  if (!(index >= 0) || index >= tasksSlots) return null;
+  const row = readRow(tasksFd, TASKS_LAYOUT, TASKS_ROW, index);
+  if (!row || row.alive !== '1') return null;
+  return toTask(index + 1, row);
 }
 
 function listUserTasks(userId) {
   const ids = tasksByUser.get(Number(userId));
   if (!ids) return [];
-  return [...ids].sort((a, b) => a - b).map((id) => tasksById.get(id));
+  return [...ids].sort((a, b) => a - b).map((id) => findTaskById(id));
 }
 
 // All tasks regardless of owner (the task board is shared).
 function listTasks() {
-  return [...tasksById.values()].sort((a, b) => a.id - b.id);
+  const out = [];
+  for (let index = 0; index < tasksSlots; index += 1) {
+    const row = readRow(tasksFd, TASKS_LAYOUT, TASKS_ROW, index);
+    if (row && row.alive === '1') out.push(toTask(index + 1, row));
+  }
+  return out;
 }
 
 function createTask({ title, userId, createdBy }) {
-  const task = {
-    id: nextTaskId++,
+  const id = nextTaskId++;
+  const row = {
     title,
-    done: false,
-    user_id: userId ?? null,
-    created_by: createdBy ?? null,
+    alive: '1',
+    done: '0',
+    user_id: userId ?? '',
+    created_by: createdBy ?? '',
     created_at: new Date().toISOString()
   };
-  tasksById.set(task.id, task);
-  if (task.user_id !== null) {
-    if (!tasksByUser.has(task.user_id)) tasksByUser.set(task.user_id, new Set());
-    tasksByUser.get(task.user_id).add(task.id);
-  }
-  markTasksDirty();
-  return task;
+  putTask(id, row);
+  indexTask(id, toNumOrNull(row.user_id));
+  taskCount += 1;
+  return toTask(id, row);
 }
 
 function updateTask(id, { title, done, userId }) {
-  const task = tasksById.get(Number(id));
+  const task = findTaskById(id);
   if (!task) return null;
   if (title !== undefined) task.title = title;
   if (done !== undefined) task.done = toBool(done);
-  // Optional reassignment: move the task between the per-user index buckets.
   if (userId !== undefined && userId !== task.user_id) {
-    if (task.user_id !== null) {
-      const set = tasksByUser.get(task.user_id);
-      if (set) { set.delete(task.id); if (!set.size) tasksByUser.delete(task.user_id); }
-    }
+    unindexTask(task.id, task.user_id);
     task.user_id = userId ?? null;
-    if (task.user_id !== null) {
-      if (!tasksByUser.has(task.user_id)) tasksByUser.set(task.user_id, new Set());
-      tasksByUser.get(task.user_id).add(task.id);
-    }
+    indexTask(task.id, task.user_id);
   }
-  markTasksDirty();
+  putTask(task.id, taskRow(task));
   return task;
 }
 
 function assignTask(taskId, userId) {
-  const task = tasksById.get(Number(taskId));
+  const task = findTaskById(taskId);
   if (!task) return null;
-  if (task.user_id !== null) {
-    const set = tasksByUser.get(task.user_id);
-    if (set) { set.delete(task.id); if (!set.size) tasksByUser.delete(task.user_id); }
-  }
+  unindexTask(task.id, task.user_id);
   task.user_id = userId ?? null;
-  if (task.user_id !== null) {
-    if (!tasksByUser.has(task.user_id)) tasksByUser.set(task.user_id, new Set());
-    tasksByUser.get(task.user_id).add(task.id);
-  }
-  markTasksDirty();
+  indexTask(task.id, task.user_id);
+  putTask(task.id, taskRow(task));
   return task;
 }
 
 function deleteTask(id) {
-  const numericId = Number(id);
-  if (!tasksById.has(numericId)) return;
-  removeTaskFromIndex(numericId);
-  markTasksDirty();
+  const task = findTaskById(id);
+  if (!task) return;
+  unindexTask(task.id, task.user_id);
+  const row = taskRow(task);
+  row.alive = '0';
+  putTask(task.id, row);
+  taskCount -= 1;
+}
+
+// ---------- durability ----------
+// Mutations are written synchronously (one small row per change). flush() fsyncs
+// them so the data survives once we return control.
+
+function flush() {
+  if (closed) return;
+  try {
+    fs.fsyncSync(usersFd);
+    fs.fsyncSync(tasksFd);
+  } catch (err) {
+    console.error('[store] flush failed:', err.message);
+  }
+}
+const flushSync = flush;
+
+let closed = false;
+// Close the file handles (used by scripts/tests that delete the data dir on Windows).
+function close() {
+  if (closed) return;
+  closed = true;
+  try { fs.closeSync(usersFd); } catch { /* already closed */ }
+  try { fs.closeSync(tasksFd); } catch { /* already closed */ }
+}
+
+process.on('exit', flush);
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.on(sig, () => { flush(); process.exit(0); });
 }
 
 module.exports = {
   DATA_DIR,
   USERS_FILE,
   TASKS_FILE,
-  USERS_HEADER,
-  TASKS_HEADER,
-  escapeValue,
-  splitLine,
-  toCsvLine,
+  USERS_LAYOUT,
+  TASKS_LAYOUT,
+  USERS_ROW,
+  TASKS_ROW,
+  MAX_EMAIL_BYTES,
+  MAX_TITLE_BYTES,
+  encodeRow,
   flush,
   flushSync,
+  close,
   getUserById,
   getUserByEmail,
   getUserByVerifyToken,

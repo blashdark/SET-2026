@@ -24,9 +24,9 @@ Mặc định server chạy ở `http://localhost:3000`.
 
 ### Giao diện (frontend)
 
-Server phục vụ luôn frontend tại `/frontend/` (cùng origin với API). Mở:
+Mở trực tiếp file trên ổ đĩa (không cần server phục vụ file tĩnh). Trang gọi API tại `http://localhost:3000`:
 
-**http://localhost:3000/frontend/html/login.html**
+**`frontend/html/login.html`**
 
 - `frontend/html/login.html` — Đăng nhập / Đăng ký
 - `frontend/html/index.html` — Danh sách công việc
@@ -46,26 +46,35 @@ Chép `.env.example` thành `.env` rồi chạy `node --env-file=.env src/index.
 | `DATA_DIR` | `backend/data` | Thư mục chứa file CSV |
 | `JWT_SECRET` | `dev-secret-change-me` | Khóa ký access token (**nên đổi**) |
 | `ACCESS_TOKEN_TTL` | `3600` | Hạn access token (giây) |
-| `SCRYPT_N` | `16384` | Cost scrypt; giảm để sign-up nhanh hơn |
 | `VERIFY_TTL_SECONDS` | `86400` | Hạn link xác thực email (giây) |
 | `SMTP_HOST/PORT/USER/PASS` | — | Cấu hình Gmail SMTP (xem dưới) |
 
 ## Lưu trữ
 
-**Không dùng database engine.** Dữ liệu nằm trong 2 file CSV do chính code đọc/ghi, dạng **snapshot** — **đúng 1 dòng cho mỗi user/task**:
+**Không dùng database engine.** Dữ liệu nằm trong 2 file CSV do chính code đọc/ghi. Mỗi file là các **bản ghi độ dài cố định** (fixed-length): mọi dòng dài đúng bằng nhau, nên dòng `id` nằm tại offset `(id-1) × ROW` và có thể **ghi đè tại chỗ**.
 
 ```
 data/
-  users.csv
-  tasks.csv
+  users.csv   # mỗi dòng 340 byte
+  tasks.csv   # mỗi dòng 180 byte
 ```
 
-Khi khởi động, server nạp file theo chunk 1MB vào các `Map` trong RAM (`usersByEmail`, `usersById`, `tasksById`…) → mọi truy vấn O(1), **check email trùng là 1 phép tra Map**. Ghi thì sửa RAM và bật cờ dirty; **flush định kỳ** (write-behind) ghi lại **cả file dạng snapshot** (ra `.tmp` rồi `rename` — atomic), nên request path không đụng đĩa.
+RAM **chỉ giữ index**, không giữ nội dung dòng — nên 1M user cũng không nạp cả dataset vào RAM:
 
-- `users.csv`: `id,email,password_hash,salt,status,verify_token,verify_expires,created_at`
-- `tasks.csv`: `id,title,done,user_id,created_by,created_at`
+- `email → id` (check trùng + login), `verify_token → id`
+- `user_id → các task id`
+- `id = slot + 1`, nên tra theo id là **phép tính**, không cần index
 
-> Không còn cột `op`: mỗi thao tác **không** ghi thêm dòng, mà làm file “bẩn” rồi flush ghi đè snapshot → file luôn đúng 1 dòng/user, không phình theo số thao tác. File cũ dạng log vẫn đọc được và tự nén lại ở lần flush đầu. Đánh đổi: mỗi lần flush ghi lại toàn file (với 1M user ~90MB), nên writes gom theo `FLUSH_MS` và chạy nền.
+- `users.csv`: `email[64], password_hash[128], salt[32], status[8], verify_token[64], verify_expires[13], created_at[24]`
+- `tasks.csv`: `title[128], alive[1], done[1], user_id[10], created_by[10], created_at[24]`
+
+Ô được **pad bằng space** cho đủ độ rộng. Dấu phẩy nằm ở **vị trí byte cố định**, đọc **cắt theo vị trí** (không tách theo dấu phẩy), nên giá trị chứa dấu phẩy vẫn an toàn. Nhập liệu bị giới hạn độ dài theo **byte UTF-8** (`email` ≤ 64, `title` ≤ 128) và `title` không được có ký tự xuống dòng.
+
+- **Ghi**: `create` nối 1 dòng vào cuối file; `update` **ghi đè đúng dòng** tại offset → không phình file, không rác, không cần compaction.
+- **Xoá**: đánh dấu ô `free` (users) / `alive=0` (tasks); **slot không tái dùng** nên id không bao giờ trùng.
+- Mỗi thay đổi ghi **đồng bộ 1 dòng nhỏ**; `flush()` chỉ `fsync`.
+
+> Đánh đổi: file **lớn hơn** bản snapshot cũ (1M user ≈ 340MB so với ≈ 87MB) vì ô cố định phải đệm; bù lại ghi 1 dòng thay vì ghi lại cả file, và RAM chỉ giữ index.
 
 ## Xác thực
 
@@ -155,10 +164,10 @@ Chi phí từng phần (`npm run bench`, engine CSV):
 | `POST /sign-up` (HTTP) | ~0.69ms | ~0.63ms |
 
 Kết luận:
-- **Phần đồng bộ của register chỉ là validate + check unique (Map) + tạo user + buffer** → **vài µs**, dư sức < 0.5ms.
-- **scrypt + ghi file + gửi mail đều chạy nền** (băm bất đồng bộ trên threadpool; CSV write-behind; mail fire-and-forget) → không nằm trên request path.
+- **Phần đồng bộ của register**: validate + check unique (Map) + **ghi 1 dòng user** (340 byte, ~µs) → vẫn < 0.5ms.
+- **Băm mật khẩu + gửi mail chạy nền** (scrypt async trên threadpool; mail fire-and-forget). `createUser` ghi **1 dòng nhỏ ngay trên request path** (rất nhanh) chứ không ghi lại cả file.
 - Nhưng **sàn HTTP của localhost đã ~0.4–0.5ms**, nên **latency một API call** thực tế ~0.6–0.7ms. Muốn số "< 0.5ms" thì tính **thời gian server xử lý** (đạt rõ ràng), hoặc báo p50 ~0.5ms + giải thích sàn HTTP.
-- Đánh đổi: vài chục ms đầu sau signup, login có thể nhận `409 "đang khởi tạo"` (chưa kịp có hash). Nếu crash đúng lúc đó, email vẫn đăng ký lại được (bản ghi hash rỗng bị coi là rác và bị ghi đè). Flush lỗi sẽ tự thử lại thay vì mất dữ liệu.
+- Đánh đổi: vài chục ms đầu sau signup, login có thể nhận `409 "đang khởi tạo"` (chưa kịp có hash). Nếu crash đúng lúc đó, email vẫn đăng ký lại được (bản ghi hash rỗng bị coi là rác và bị ghi đè).
 
 ## Ví dụ với cURL
 
@@ -212,14 +221,15 @@ curl -X DELETE http://localhost:3000/task/1 -H "Authorization: Bearer $TOKEN"
 ```
 backend/
   src/
-    index.js      # entry: http server + routing + handlers + static /frontend/*
-    store.js        # engine CSV tự dựng: index RAM, ghi snapshot (write-behind)
+    index.js      # entry: http server + routing + handlers (API only)
+    store.js        # file CSV fixed-length: index trong RAM, ghi tại chỗ
     auth.js         # hash password (scrypt) + ký/verify access token (HMAC)
     mailer.js     # gửi email xác thực qua nodemailer (Gmail SMTP)
   scripts/
     seed.js       # seed N user vào users.csv
     bench.js      # đo chi phí sign-up
     bench-api.js  # đo độ trễ HTTP của POST /sign-up
+    migrate-to-fixed.js  # chuyển data cũ (variable-length) sang fixed-length
   test/
     smoke.js      # smoke test toàn bộ endpoint
   data/           # users.csv, tasks.csv (tự tạo, đã gitignore)

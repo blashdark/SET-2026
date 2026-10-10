@@ -156,6 +156,25 @@ function passwordError(password) {
   return null;
 }
 
+// Value must fit the store's fixed cell (width in BYTES, UTF-8). Returns error or null.
+function emailError(email) {
+  if (!isEmail(email)) return 'Email không hợp lệ';
+  if (Buffer.byteLength(email, 'utf8') > db.MAX_EMAIL_BYTES) {
+    return `Email quá dài (tối đa ${db.MAX_EMAIL_BYTES} byte)`;
+  }
+  return null;
+}
+
+// title: non-empty, single-line (no CR/LF), and fits its fixed cell.
+function titleError(title) {
+  if (!title) return 'Tiêu đề không được để trống';
+  if (/[\r\n]/.test(title)) return 'Tiêu đề không được chứa ký tự xuống dòng';
+  if (Buffer.byteLength(title, 'utf8') > db.MAX_TITLE_BYTES) {
+    return `Tiêu đề quá dài (tối đa ${db.MAX_TITLE_BYTES} byte)`;
+  }
+  return null;
+}
+
 // ---------- handlers ----------
 
 // Ids whose scrypt hash is still running in the background. Lets us tell a
@@ -167,7 +186,8 @@ async function signUp(res, body) {
   const email = String(body.email ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
 
-  if (!isEmail(email)) return fail(res, 400, 'Email không hợp lệ');
+  const emErr = emailError(email);
+  if (emErr) return fail(res, 400, emErr);
   const pwErr = passwordError(password);
   if (pwErr) return fail(res, 400, pwErr);
 
@@ -272,7 +292,8 @@ function deleteUser(res, id) {
 
 function createTask(res, body, user) {
   const title = String(body.title ?? '').trim();
-  if (!title) return fail(res, 400, 'Tiêu đề không được để trống');
+  const tErr = titleError(title);
+  if (tErr) return fail(res, 400, tErr);
 
   // A new task starts UNASSIGNED: user_id = null. created_by records the author;
   // a user is attached later via assign-task (or an update that sets user_id).
@@ -286,7 +307,10 @@ function updateTask(res, id, body, user) {
   // Shared board: any authenticated user may edit any task (see GET /tasks).
 
   const nextTitle = body.title !== undefined ? String(body.title).trim() : undefined;
-  if (nextTitle !== undefined && !nextTitle) return fail(res, 400, 'Tiêu đề không được để trống');
+  if (nextTitle !== undefined) {
+    const tErr = titleError(nextTitle);
+    if (tErr) return fail(res, 400, tErr);
+  }
 
   // Optional reassignment: user_id may be a positive integer, or null to unassign.
   let userId;

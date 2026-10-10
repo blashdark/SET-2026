@@ -8,12 +8,13 @@ Tài liệu này giải thích server khởi động thế nào, một request �
 backend/
   src/
     index.js  # entry: tạo HTTP server, routing (if/else), tất cả handler
-    store.js  # lớp dữ liệu: engine CSV tự dựng (index RAM, ghi dạng snapshot)
+    store.js  # lớp dữ liệu: file CSV fixed-length (index trong RAM, ghi tại chỗ)
     auth.js   # hash password (scrypt) + tạo/kiểm tra access token (HMAC)
     mailer.js # gửi email xác thực qua nodemailer (Gmail SMTP)
   scripts/
     seed.js   # seed N user vào users.csv
     bench.js  # đo chi phí sign-up
+    migrate-to-fixed.js  # chuyển data cũ (variable-length) sang fixed-length
   test/
     smoke.js  # chạy server trên port + data tạm, test toàn bộ endpoint
   data/       # users.csv, tasks.csv (tự tạo, đã gitignore)
@@ -24,7 +25,7 @@ frontend/
   js/         # auth.js, app.js
 ```
 
-`index.js` phục vụ luôn `frontend/` tại `/frontend/*` (cùng origin), nên mở `http://localhost:3000/frontend/html/login.html`.
+`index.js` chỉ chạy API; frontend mở trực tiếp từ đĩa (script gọi API tại `http://localhost:3000`, CORS đã mở).
 
 Phụ thuộc: `index.js` → `store.js` + `auth.js` + `mailer.js`. Ba file kia không phụ thuộc lẫn nhau.
 
@@ -59,11 +60,10 @@ flowchart TD
 ```
 
 1. Lấy `method` và `path` (`req.url.split('?')[0]`).
-2. **File tĩnh**: `GET /frontend/*` → phục vụ file trong `../frontend` (chặn path traversal).
-3. **Route công khai**: `POST /sign-up`, `POST /login`, `GET /verify`, `POST /resend-verification`.
-4. **Xác thực**: `currentUser(req)` đọc header `Authorization: Bearer <token>`, verify, tra user. Thiếu/sai → `401`.
-5. **Route cần auth**: so `method` + `path` bằng `if/else` (dùng `startsWith` cho path có `:id`).
-6. Không khớp → `404`. Mọi lỗi bắt ở `catch` → trả `err.status || 500`.
+2. **Route công khai**: `POST /sign-up`, `POST /login`, `GET /verify`, `POST /resend-verification`.
+3. **Xác thực**: `currentUser(req)` đọc header `Authorization: Bearer <token>`, verify, tra user. Thiếu/sai → `401`.
+4. **Route cần auth**: so `method` + `path` bằng `if/else` (dùng `startsWith` cho path có `:id`).
+5. Không khớp → `404`. Mọi lỗi bắt ở `catch` → trả `err.status || 500`.
 
 ## 4. `auth.js`
 
@@ -76,17 +76,19 @@ flowchart TD
 | `createToken(userId)` | payload `{ sub, exp }` → base64url, ký HMAC-SHA256 → `body.signature` |
 | `readToken(token)` | kiểm chữ ký + `exp`; hợp lệ trả `sub` (id user), ngược lại `null` |
 
-Token **stateless** (server không lưu). Đổi `JWT_SECRET` ⇒ token cũ vô hiệu. Cost scrypt chỉnh qua `SCRYPT_N`.
+Token **stateless** (server không lưu). Đổi `JWT_SECRET` ⇒ token cũ vô hiệu.
 
 ## 5. `store.js` (engine CSV tự dựng)
 
-Không DB engine. Hai file CSV ở dạng **snapshot**: header + **đúng 1 dòng cho mỗi user/task** (không còn `op`, không có dòng trùng).
+Không DB engine. Hai file CSV dạng **fixed-length**: mọi dòng dài bằng nhau, nên dòng `id` ở offset `(id-1) × ROW` — tra bằng số học, ghi đè tại chỗ.
 
-- **Boot**: `loadCsv` đọc file theo chunk 1MB, lấy header **từ chính file** → `applyUserRow`/`applyTaskRow` nạp vào `Map` (`usersById`, `usersByEmail`, `usersByToken`, `tasksById`, `tasksByUser`) + `nextId`. File cũ dạng log (cột `op`) vẫn đọc được và sẽ được nén lại thành snapshot ở lần `flush` kế tiếp.
-- **Đọc** (mọi hàm `get*`/`list*`): thuần RAM, O(1) — vd check email trùng = `usersByEmail.get(...)`.
-- **Ghi** (`createUser`, `activateUser`, `setPasswordHash`, `createTask`, `updateTask`, `assignTask`…): sửa RAM + bật cờ dirty; **`flush()` định kỳ** (`FLUSH_MS`, mặc định 200ms) ghi lại **toàn bộ file dạng snapshot** (ghi ra `.tmp` rồi `rename` — atomic, không thấy file dở); khi `exit`/`SIGINT`/`SIGTERM` dùng `flushSync()`. Request path **không đụng đĩa**.
-- CSV helpers: `escapeValue` / `toCsvLine` (hỗ trợ `,` `"` `\n`). `loadCsv` là parser **có state**: theo dõi dấu ngoặc xuyên dòng (giá trị chứa `\n` vẫn đọc đúng) và giải mã chunk bằng `StringDecoder` (ký tự multibyte vắt qua mốc 1MB không bị hỏng).
-- API giữ nguyên nên `index.js` không phải sửa: users: `getUserById`, `getUserByEmail`, `getUserByVerifyToken`, `createUser`, `activateUser`, `setVerifyToken`, `setPasswordHash`, `deleteUser`, `listUsers(limit, offset)`, `countUsers`, `countUserTasks`; tasks: `findTaskById`, `listUserTasks`, `createTask`, `updateTask`, `assignTask`, `deleteTask`.
+- **Boot**: `loadUsers`/`loadTasks` quét file theo chunk (512 dòng/lần) và **chỉ dựng index** trong RAM (`emailToId`, `tokenToId`, `tasksByUser`, `usersSlots`/`tasksSlots`, `nextId`). Nội dung dòng **không** giữ trong RAM.
+- **Đọc** (`get*`/`list*`): `email → id` là tra Map; lấy dòng thì `readRow` seek `(id-1) × ROW` và giải mã 1 dòng.
+- **Ghi** (`createUser`, `activateUser`, `setPasswordHash`, `createTask`, `updateTask`, `assignTask`…): `create` nối 1 dòng cuối file, `update` ghi đè đúng offset; cập nhật index. Mỗi thay đổi ghi **đồng bộ 1 dòng** (không dirty/flush định kỳ); `flush()` chỉ `fsync` (gọi khi exit/SIGINT/SIGTERM).
+- Codec: `encodeRow` (pad ô bằng space đủ độ rộng, chèn `,` ở vị trí cố định) / `decodeRow` (cắt theo **byte offset**, dấu phẩy trong giá trị vẫn an toàn). Vượt độ rộng → `400` từ `index.js` (`email` ≤ 64, `title` ≤ 128 byte).
+- API giữ nguyên nên `index.js` chỉ thêm validate độ dài: users: `getUserById`, `getUserByEmail`, `getUserByVerifyToken`, `createUser`, `activateUser`, `setVerifyToken`, `setPasswordHash`, `deleteUser`, `listUsers(limit, offset)`, `countUsers`, `countUserTasks`; tasks: `findTaskById`, `listUserTasks`, `createTask`, `updateTask`, `assignTask`, `deleteTask`.
+
+> File cũ dạng snapshot (variable-length + header) được chuyển một lần bằng `scripts/migrate-to-fixed.js`.
 
 ## 6. `mailer.js`
 
@@ -134,6 +136,6 @@ sequenceDiagram
 ## 9. Ghi chú
 
 - **Routing**: if/else trên `method` + `path`; path có `:id` dùng `startsWith` + `idFrom`. Sai method → coi như `404`.
-- **CSV engine**: tra cứu O(1) trên Map; seed 1M user ~4s; ghi dạng snapshot, tự nén file ở lần flush đầu.
-- **5ms**: nút thắt là scrypt (`SCRYPT_N`), không phải DB. Xem mục "Hiệu năng" trong README.
+- **Store**: rows fixed-length, `id = slot + 1`; tra cứu O(1) qua index RAM; ghi đè 1 dòng tại chỗ (không ghi lại cả file).
+- **5ms**: nút thắt là scrypt, không phải DB. Xem mục "Hiệu năng" trong README.
 - **Bảo mật (bài tập)**: so sánh chữ ký/hash bằng `===` cho dễ hiểu (bản production nên dùng `crypto.timingSafeEqual`).

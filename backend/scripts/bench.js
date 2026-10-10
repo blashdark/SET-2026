@@ -25,16 +25,17 @@ function bench(label, fn) {
   console.log(`${label.padEnd(32)} ${(ms / N).toFixed(4)} ms/op   (${ms.toFixed(1)} ms cho ${N})`);
 }
 
-console.log(`Node ${process.version} | SCRYPT_N=${auth.SCRYPT_N} | ${N} iterations\n`);
+console.log(`Node ${process.version} | ${N} iterations\n`);
 
 bench('1. hash only (scrypt)', () => auth.hashPassword('Str0ng!pass'));
 bench('2. unique check (getUserByEmail)', (i) => store.getUserByEmail(`bench${i}@example.com`));
-bench('3. createUser (engine: Map + buffer)', (i) => store.createUser({
+bench('3. createUser (index + 1 row write)', (i) => store.createUser({
   email: `bench${i}@example.com`, passwordHash: 'h', salt: 's'
 }));
 
 store.flush();
+store.close();
 fs.rmSync(process.env.DATA_DIR, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 
-console.log('\nGhi chú: register giữ ĐỒNG BỘ chỉ mục 1-2 (validate + unique).');
+console.log('\nGhi chú: register giữ ĐỒNG BỘ mục 1-3 (validate + unique + 1 dòng).');
 console.log('scrypt (dòng 1) chạy nền, không nằm trên request path.');
