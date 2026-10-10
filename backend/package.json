@@ -2,13 +2,20 @@
   "name": "auth-task-rest-api",
   "version": "1.0.0",
   "private": true,
-  "description": "REST API xac thuc (access token) + quan ly task, viet bang Node core, khong dependency",
-  "main": "index.js",
+  "description": "REST API xac thuc email (access token + verify email) + quan ly task, luu tru bang engine CSV tu dung va nodemailer",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node --watch index.js"
+    "start": "node --env-file-if-exists=.env src/index.js",
+    "dev": "node --env-file-if-exists=.env --watch src/index.js",
+    "test": "node test/store.test.js && node test/smoke.js",
+    "seed": "node scripts/seed.js",
+    "bench": "node scripts/bench.js",
+    "bench:api": "node scripts/bench-api.js"
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "nodemailer": "^10.1.0"
   }
 }
