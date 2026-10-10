@@ -46,7 +46,7 @@ async function sendVerificationEmail(email, token) {
   const ttl = ttlText();
 
   if (!transporter) {
-    console.log(`[mailer] SMTP chưa cấu hình. Link xác thực cho ${email}: ${link}`);
+    console.log(`[mailer] SMTP not configured. Verification link for ${email}: ${link}`);
     return { delivered: false, link };
   }
 
