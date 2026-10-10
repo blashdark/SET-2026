@@ -1,7 +1,7 @@
 'use strict';
 
-// Same origin when served by the backend (/frontend/...); fall back to :3000 when opened via file://.
-const API_BASE = location.protocol === 'file:' ? 'http://localhost:3000' : '';
+// Frontend is opened from disk; the API always runs at :3000.
+const API_BASE = 'http://localhost:3000';
 let token = localStorage.getItem('accessToken');
 if (!token) location.replace('login.html');
 

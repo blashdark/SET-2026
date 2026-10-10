@@ -11,31 +11,17 @@ if (typeof process.loadEnvFile === 'function') {
 }
 
 const http = require('http'); // node:http built-in: create the server
-const fs = require('fs'); // node:fs built-in: stream static files
 const db = require('./store');
 const auth = require('./auth');
 const mailer = require('./mailer');
 
 console.log(mailer.isConfigured()
-  ? '[mailer] Gmail SMTP đã cấu hình -> gửi mail thật'
-  : '[mailer] dev mode (SMTP chưa cấu hình) -> in link ra console');
+  ? '[mailer] Gmail SMTP configured -> sending real email'
+  : '[mailer] dev mode (no SMTP) -> printing the link to the console');
 
 const PORT = Number(process.env.PORT || 3000); // read PORT from the environment
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
 const VERIFY_TTL_MS = Number(process.env.VERIFY_TTL_SECONDS || 86400) * 1000; // 24h
-
-// Frontend is served by this same server under /frontend/* (same origin as the API).
-const FRONTEND_DIR = path.resolve(__dirname, '..', '..', 'frontend');
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.ico': 'image/x-icon'
-};
 
 // ---------- HTTP helpers ----------
 
@@ -86,24 +72,10 @@ function verifyPage(title, message) {
     <div class="icon">✓</div>
     <h1>${title}</h1>
     <p>${message}</p>
-    <a href="/frontend/html/login.html">Về trang đăng nhập</a>
+    <p>Mở <code>frontend/html/login.html</code> trên máy để đăng nhập.</p>
   </main>
 </body>
 </html>`;
-}
-
-// Serve a static file from ../frontend (guards against path traversal).
-function serveStatic(res, urlPath) {
-  const rel = urlPath.replace(/^\/frontend\/?/, '');
-  const filePath = path.resolve(FRONTEND_DIR, rel || 'html/index.html');
-  if (filePath !== FRONTEND_DIR && !filePath.startsWith(FRONTEND_DIR + path.sep)) {
-    return fail(res, 403, 'Forbidden');
-  }
-  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return fail(res, 404, 'Not found');
-  const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
-  // no-cache so edits to html/css/js always show up on refresh (dev server).
-  res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
-  fs.createReadStream(filePath).pipe(res);
 }
 
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || (1 << 20)); // cap request size (1 MiB)
@@ -120,7 +92,7 @@ function readBody(req) {
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
         settled = true;
-        const err = new Error('Request body too large');
+        const err = new Error('Nội dung yêu cầu quá lớn');
         err.status = 413;
         reject(err);
         return;
@@ -134,7 +106,7 @@ function readBody(req) {
       try {
         resolve(JSON.parse(raw)); // JSON.parse: parse the raw body
       } catch {
-        const err = new Error('Body is not valid JSON');
+        const err = new Error('Nội dung không phải JSON hợp lệ');
         err.status = 400;
         reject(err);
       }
@@ -177,10 +149,10 @@ function parseBool(value) {
 // Password policy: >= 8 chars, 1 upper, 1 lower, 1 special. Returns an error or null.
 function passwordError(password) {
   const pw = String(password ?? '');
-  if (pw.length < 8) return 'password must be at least 8 characters';
-  if (!/[A-Z]/.test(pw)) return 'password must contain an uppercase letter';
-  if (!/[a-z]/.test(pw)) return 'password must contain a lowercase letter';
-  if (!/[^A-Za-z0-9]/.test(pw)) return 'password must contain a special character';
+  if (pw.length < 8) return 'Mật khẩu phải có ít nhất 8 ký tự';
+  if (!/[A-Z]/.test(pw)) return 'Mật khẩu phải có ít nhất một chữ hoa';
+  if (!/[a-z]/.test(pw)) return 'Mật khẩu phải có ít nhất một chữ thường';
+  if (!/[^A-Za-z0-9]/.test(pw)) return 'Mật khẩu phải có ít nhất một ký tự đặc biệt';
   return null;
 }
 
@@ -195,7 +167,7 @@ async function signUp(res, body) {
   const email = String(body.email ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
 
-  if (!isEmail(email)) return fail(res, 400, 'email không hợp lệ');
+  if (!isEmail(email)) return fail(res, 400, 'Email không hợp lệ');
   const pwErr = passwordError(password);
   if (pwErr) return fail(res, 400, pwErr);
 
@@ -205,7 +177,7 @@ async function signUp(res, body) {
     // orphan (empty hash and no hash currently running). This heals an account
     // that would otherwise answer 409 forever and could never register again.
     const hashing = !existing.password_hash && pendingHashes.has(existing.id);
-    if (existing.password_hash || hashing) return fail(res, 409, 'email đã tồn tại');
+    if (existing.password_hash || hashing) return fail(res, 409, 'Email đã tồn tại');
     db.deleteUser(existing.id);
   }
 
@@ -290,9 +262,9 @@ async function resendVerification(res, body) {
 }
 
 function deleteUser(res, id) {
-  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Invalid user id');
-  if (!db.getUserById(id)) return fail(res, 404, 'User not found');
-  if (db.countUserTasks(id) > 0) return fail(res, 409, 'User still has tasks and cannot be deleted'); // block while tasks remain
+  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id người dùng không hợp lệ');
+  if (!db.getUserById(id)) return fail(res, 404, 'Không tìm thấy người dùng');
+  if (db.countUserTasks(id) > 0) return fail(res, 409, 'Người dùng còn công việc, không thể xoá'); // block while tasks remain
 
   db.deleteUser(id);
   return noContent(res);
@@ -300,7 +272,7 @@ function deleteUser(res, id) {
 
 function createTask(res, body, user) {
   const title = String(body.title ?? '').trim();
-  if (!title) return fail(res, 400, 'title is required');
+  if (!title) return fail(res, 400, 'Tiêu đề không được để trống');
 
   // A new task starts UNASSIGNED: user_id = null. created_by records the author;
   // a user is attached later via assign-task (or an update that sets user_id).
@@ -308,12 +280,13 @@ function createTask(res, body, user) {
 }
 
 function updateTask(res, id, body, user) {
-  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Invalid task id');
+  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id công việc không hợp lệ');
   const task = db.findTaskById(id);
-  if (!task) return fail(res, 404, 'Task not found');
+  if (!task) return fail(res, 404, 'Không tìm thấy công việc');
   // Shared board: any authenticated user may edit any task (see GET /tasks).
 
-  if (body.title !== undefined && !String(body.title).trim()) return fail(res, 400, 'title cannot be empty');
+  const nextTitle = body.title !== undefined ? String(body.title).trim() : undefined;
+  if (nextTitle !== undefined && !nextTitle) return fail(res, 400, 'Tiêu đề không được để trống');
 
   // Optional reassignment: user_id may be a positive integer, or null to unassign.
   let userId;
@@ -322,14 +295,14 @@ function updateTask(res, id, body, user) {
       userId = null;
     } else {
       const target = Number(body.user_id);
-      if (!Number.isInteger(target) || target <= 0) return fail(res, 400, 'user_id must be a positive integer or null');
-      if (!db.getUserById(target)) return fail(res, 404, 'Target user not found');
+      if (!Number.isInteger(target) || target <= 0) return fail(res, 400, 'Trường user_id phải là số nguyên dương hoặc null');
+      if (!db.getUserById(target)) return fail(res, 404, 'Không tìm thấy người dùng đích');
       userId = target;
     }
   }
 
   const updated = db.updateTask(id, {
-    title: body.title !== undefined ? String(body.title).trim() : undefined,
+    title: nextTitle,
     done: body.done !== undefined ? parseBool(body.done) : undefined,
     userId
   });
@@ -338,19 +311,19 @@ function updateTask(res, id, body, user) {
 
 function assignTask(res, id, body) {
   const userId = Number(body.user_id); // target owner comes from the body
-  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Invalid task id');
-  if (!Number.isInteger(userId) || userId <= 0) return fail(res, 400, 'user_id must be a positive integer');
-  if (!db.findTaskById(id)) return fail(res, 404, 'Task not found');
-  if (!db.getUserById(userId)) return fail(res, 404, 'Target user not found');
+  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id công việc không hợp lệ');
+  if (!Number.isInteger(userId) || userId <= 0) return fail(res, 400, 'Trường user_id phải là số nguyên dương');
+  if (!db.findTaskById(id)) return fail(res, 404, 'Không tìm thấy công việc');
+  if (!db.getUserById(userId)) return fail(res, 404, 'Không tìm thấy người dùng đích');
 
   return send(res, 200, db.assignTask(id, userId));
 }
 
 function deleteTask(res, id, user) {
-  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Invalid task id');
+  if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id công việc không hợp lệ');
 
   const task = db.findTaskById(id);
-  if (!task) return fail(res, 404, 'Task not found');
+  if (!task) return fail(res, 404, 'Không tìm thấy công việc');
   // Shared board: any authenticated user may delete any task.
 
   db.deleteTask(id);
@@ -373,9 +346,6 @@ const server = http.createServer(async (req, res) => { // called for every reque
   }
 
   try {
-    // Static frontend (same origin as the API).
-    if (method === 'GET' && path.startsWith('/frontend/')) return serveStatic(res, path);
-
     // Public routes.
     if (method === 'POST' && path === '/sign-up') return await signUp(res, await readBody(req));
     if (method === 'POST' && path === '/login') return login(res, await readBody(req));
@@ -386,7 +356,7 @@ const server = http.createServer(async (req, res) => { // called for every reque
 
     // Everything below needs a valid token.
     const user = currentUser(req);
-    if (!user) return fail(res, 401, 'Unauthenticated or invalid token');
+    if (!user) return fail(res, 401, 'Chưa đăng nhập hoặc token không hợp lệ');
 
     if (method === 'GET' && path === '/me') return send(res, 200, publicUser(user));
     if (method === 'GET' && path === '/users') {
@@ -403,14 +373,14 @@ const server = http.createServer(async (req, res) => { // called for every reque
     if (method === 'PATCH' && path.startsWith('/assign-task/')) return assignTask(res, idFrom(path, '/assign-task/'), await readBody(req));
     if (method === 'GET' && path.startsWith('/user/')) {
       const u = db.getUserById(idFrom(path, '/user/'));
-      if (!u) return fail(res, 404, 'User not found');
+      if (!u) return fail(res, 404, 'Không tìm thấy người dùng');
       return send(res, 200, publicUser(u));
     }
     if (method === 'DELETE' && path.startsWith('/user/')) return deleteUser(res, idFrom(path, '/user/'));
 
-    return fail(res, 404, `Not found: ${path}`);
+    return fail(res, 404, `Không tìm thấy: ${path}`);
   } catch (err) {
-    return fail(res, err.status || 500, err.message || 'Internal server error');
+    return fail(res, err.status || 500, err.message || 'Lỗi máy chủ');
   }
 });
 

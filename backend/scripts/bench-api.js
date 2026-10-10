@@ -48,7 +48,6 @@ async function main() {
       PORT: String(PORT),
       DATA_DIR,
       JWT_SECRET: 'bench-secret',
-      SCRYPT_N: process.env.SCRYPT_N || '16384',
       SMTP_HOST: '', SMTP_USER: '', SMTP_PASS: '' // dev mode: no real SMTP
     },
     stdio: ['ignore', 'pipe', 'pipe']

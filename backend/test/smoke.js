@@ -230,16 +230,7 @@ async function main() {
     const bobDeleteUser = await request('DELETE', `/user/${bob.id}`, { token: bob.accessToken });
     check('DELETE /user (no tasks) -> 204', bobDeleteUser.status === 204, bobDeleteUser);
 
-    // 9. static frontend + verify page
-    const page = await request('GET', '/frontend/html/index.html');
-    check('GET /frontend/html/index.html -> 200', page.status === 200 && String(page.data).includes('<title>'), { status: page.status });
-
-    const loginPage = await request('GET', '/frontend/html/login.html');
-    const loginHtml = String(loginPage.data);
-    check('GET /frontend/html/login.html -> 200 (tabs at bottom, no submit-btn)',
-      loginPage.status === 200 && loginHtml.includes('id="tab-login"') && loginHtml.includes('type="submit" id="tab-login"') && !loginHtml.includes('submit-btn'),
-      { status: loginPage.status });
-
+    // 9. verify page
     const noTokenVerify = await request('GET', '/verify');
     check('GET /verify (no token) -> 400', noTokenVerify.status === 400, noTokenVerify);
 

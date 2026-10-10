@@ -5,21 +5,16 @@ const crypto = require('crypto'); // node:crypto built-in: hashing + HMAC
 const SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 const TTL_SECONDS = Number(process.env.ACCESS_TOKEN_TTL || 3600);
 
-// scrypt cost: N is the CPU/memory work factor. Lower N = faster sign-up but
-// weaker brute-force resistance. Tunable so the performance target can be met.
-const SCRYPT_N = Number(process.env.SCRYPT_N || 16384);
-const SCRYPT_OPTS = { N: SCRYPT_N, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
-
 // Hash a password with a random salt using scrypt.
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex'); // crypto.randomBytes: 16 random bytes -> hex string
-  const hash = crypto.scryptSync(password, salt, 64, SCRYPT_OPTS).toString('hex'); // scryptSync: derive a 64-byte key, as hex
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex'); // scryptSync: derive a 64-byte key, as hex
   return { salt, hash };
 }
 
 // Check a plain password against the stored salt + hash.
 function checkPassword(password, salt, hash) {
-  const actual = crypto.scryptSync(password, salt, 64, SCRYPT_OPTS).toString('hex'); // re-derive with the stored salt
+  const actual = crypto.scryptSync(password, salt, 64).toString('hex'); // re-derive with the stored salt
   return actual === hash;
 }
 
@@ -28,7 +23,7 @@ function checkPassword(password, salt, hash) {
 function hashPasswordAsync(password) {
   return new Promise((resolve, reject) => {
     const salt = crypto.randomBytes(16).toString('hex');
-    crypto.scrypt(password, salt, 64, SCRYPT_OPTS, (err, key) => {
+    crypto.scrypt(password, salt, 64, (err, key) => {
       if (err) return reject(err);
       resolve({ salt, hash: key.toString('hex') });
     });
@@ -61,4 +56,4 @@ function readToken(token) {
   return payload.sub;
 }
 
-module.exports = { TTL_SECONDS, SCRYPT_N, hashPassword, hashPasswordAsync, checkPassword, randomToken, createToken, readToken };
+module.exports = { TTL_SECONDS, hashPassword, hashPasswordAsync, checkPassword, randomToken, createToken, readToken };

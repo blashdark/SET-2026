@@ -1,7 +1,7 @@
 'use strict';
 
-// Same origin when served by the backend (/frontend/...); fall back to :3000 when opened via file://.
-const API_BASE = location.protocol === 'file:' ? 'http://localhost:3000' : '';
+// Frontend is opened from disk; the API always runs at :3000.
+const API_BASE = 'http://localhost:3000';
 
 const form = document.getElementById('auth-form');
 const emailInput = document.getElementById('email');
@@ -93,10 +93,10 @@ function validate() {
 
   const pw = passwordInput.value;
   if (mode === 'signup') {
-    if (pw.length < 8) { markInvalid(passwordInput, passwordError, 'Mật khẩu tối thiểu 8 ký tự'); ok = false; }
-    else if (!/[A-Z]/.test(pw)) { markInvalid(passwordInput, passwordError, 'Cần ít nhất 1 chữ hoa'); ok = false; }
-    else if (!/[a-z]/.test(pw)) { markInvalid(passwordInput, passwordError, 'Cần ít nhất 1 chữ thường'); ok = false; }
-    else if (!/[^A-Za-z0-9]/.test(pw)) { markInvalid(passwordInput, passwordError, 'Cần ít nhất 1 ký tự đặc biệt'); ok = false; }
+    if (pw.length < 8) { markInvalid(passwordInput, passwordError, 'Mật khẩu phải có ít nhất 8 ký tự'); ok = false; }
+    else if (!/[A-Z]/.test(pw)) { markInvalid(passwordInput, passwordError, 'Mật khẩu phải có ít nhất một chữ hoa'); ok = false; }
+    else if (!/[a-z]/.test(pw)) { markInvalid(passwordInput, passwordError, 'Mật khẩu phải có ít nhất một chữ thường'); ok = false; }
+    else if (!/[^A-Za-z0-9]/.test(pw)) { markInvalid(passwordInput, passwordError, 'Mật khẩu phải có ít nhất một ký tự đặc biệt'); ok = false; }
   } else if (!pw) {
     markInvalid(passwordInput, passwordError, 'Vui lòng nhập mật khẩu');
     ok = false;
