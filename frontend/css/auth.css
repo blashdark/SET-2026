@@ -1,0 +1,116 @@
+/* ================= Đăng nhập / Đăng ký (tông kaki) ================= */
+:root {
+  --primary: #6b7a3a;
+  --primary-hover: #59672f;
+  --text: #33301f;
+  --muted: #7c7a66;
+  --border: #e4dac2;
+  --card: #fffdf7;
+  --brand-grad: linear-gradient(135deg, #59672f 0%, #7d8c43 55%, #b7a35c 100%);
+  --ring: rgba(107, 122, 58, .22);
+  --field-bg: #faf7ee;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background-color: #e7dfcb;
+  background-image:
+    radial-gradient(60vw 60vw at 12% 6%, rgba(125, 140, 67, .34), transparent 60%),
+    radial-gradient(55vw 55vw at 90% 94%, rgba(183, 163, 92, .34), transparent 62%),
+    linear-gradient(160deg, #ece5d3, #dcd1b6 72%);
+  color: var(--text);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--card);
+  border-radius: 22px;
+  padding: 34px 30px 30px;
+  box-shadow: 0 30px 60px -24px rgba(60, 52, 32, .45), 0 0 0 1px rgba(90, 78, 44, .06);
+  animation: card-in .35s ease both;
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* brand */
+.brand { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.logo {
+  flex: none;
+  width: 46px; height: 46px; border-radius: 14px;
+  background: var(--brand-grad); color: #fffdf7;
+  display: grid; place-items: center; font-size: 22px; font-weight: 700;
+  box-shadow: 0 12px 22px -10px rgba(89, 103, 47, .75), inset 0 0 0 1px rgba(255, 253, 247, .28);
+}
+.brand-text h1 { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
+.subtitle { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; }
+
+/* fields */
+.field { margin-bottom: 16px; }
+label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px; color: #4a4532; }
+
+.control { position: relative; }
+.control-icon {
+  position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; color: #a89f86; pointer-events: none;
+}
+.control-icon svg { width: 18px; height: 18px; display: block; }
+
+input {
+  width: 100%; height: 46px; padding: 0 14px 0 40px;
+  font-size: 15px; color: var(--text);
+  background: var(--field-bg); border: 1px solid var(--border); border-radius: 12px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+input::placeholder { color: #a89f86; }
+input:focus { background: #fffefb; border-color: var(--primary); box-shadow: 0 0 0 4px var(--ring); }
+input.invalid { border-color: #b4452f; box-shadow: 0 0 0 4px rgba(180, 69, 47, .14); }
+
+.field-error { color: var(--error-text); font-size: 12.5px; margin-top: 6px; min-height: 15px; }
+
+/* animated hint list */
+.hint-list {
+  max-height: 0; margin: 0; padding-left: 18px; overflow: hidden; opacity: 0;
+  color: var(--muted); font-size: 12.5px; line-height: 1.6;
+  transition: max-height .25s ease, opacity .2s ease, margin .25s ease;
+}
+.hint-list.open { max-height: 120px; margin: 8px 0 0; opacity: 1; }
+
+/* stacked action buttons (active on top) */
+.tabs { position: relative; height: 106px; margin-top: 20px; }
+.tabs button {
+  position: absolute; left: 0; right: 0; top: 0; height: 48px;
+  border: none; border-radius: 12px; font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  transition: transform .22s ease, background .18s ease, box-shadow .18s ease, color .18s ease, filter .18s ease;
+}
+.tabs button:not(.active) {
+  transform: translateY(58px);
+  background: #efe9d8; color: #5f5b45;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.tabs button:not(.active):hover { background: #e6dfca; }
+.tabs button.active {
+  transform: translateY(0); z-index: 1;
+  background: var(--brand-grad); color: #fffdf7;
+  box-shadow: 0 14px 26px -12px rgba(89, 103, 47, .8);
+}
+.tabs button.active:hover { filter: brightness(1.05); }
+.tabs button:disabled { opacity: .65; cursor: not-allowed; }
+
+/* message */
+.message { margin-top: 16px; padding: 11px 14px; border-radius: 12px; font-size: 13.5px; display: none; }
+.message.error { display: block; background: #fbeee9; color: #9a3b23; }
+.message.success { display: block; background: #eef3df; color: #4e6b2e; }
+.message a { color: inherit; font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}

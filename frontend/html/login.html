@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TodoList - Đăng nhập / Đăng ký</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/auth.css">
+</head>
+<body>
+  <main class="card">
+    <header class="brand">
+      <div class="logo" aria-hidden="true">✓</div>
+      <div class="brand-text">
+        <h1>TodoList</h1>
+        <p class="subtitle" id="subtitle">Đăng nhập để quản lý công việc của bạn</p>
+      </div>
+    </header>
+
+    <form id="auth-form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <div class="control">
+          <span class="control-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+          </span>
+          <input id="email" name="email" type="email" autocomplete="email" placeholder="you@example.com" aria-describedby="email-error" required>
+        </div>
+        <div class="field-error" id="email-error" aria-live="polite"></div>
+      </div>
+
+      <div class="field">
+        <label for="password">Mật khẩu</label>
+        <div class="control">
+          <span class="control-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+          </span>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu" aria-describedby="password-error password-policy" required>
+        </div>
+        <div class="field-error" id="password-error" aria-live="polite"></div>
+        <ul class="hint-list" id="password-policy">
+          <li>Tối thiểu 8 ký tự</li>
+          <li>Có chữ hoa, chữ thường và ký tự đặc biệt</li>
+        </ul>
+      </div>
+
+      <div class="tabs">
+        <button type="submit" id="tab-login" class="active" aria-pressed="true">Đăng nhập</button>
+        <button type="button" id="tab-signup" aria-pressed="false">Đăng ký</button>
+      </div>
+    </form>
+
+    <div id="message" class="message" role="alert" aria-live="assertive"></div>
+  </main>
+
+  <script src="../js/auth.js"></script>
+</body>
+</html>

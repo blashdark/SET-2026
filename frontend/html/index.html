@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TodoList - Công việc</title>
+  <link rel="stylesheet" href="../css/base.css">
+  <link rel="stylesheet" href="../css/app.css">
+</head>
+<body>
+  <header>
+    <div class="logo">✓</div>
+    <h1>TodoList</h1>
+    <span class="me" id="me"></span>
+    <button class="ghost" id="logout" type="button">Đăng xuất</button>
+  </header>
+
+  <main>
+    <section class="panel">
+      <h2>Công việc</h2>
+      <div class="add-task">
+        <input id="new-title" placeholder="Tên công việc..." autocomplete="off">
+        <button class="primary" id="add-btn" type="button">Thêm</button>
+      </div>
+      <ul class="list" id="task-list"></ul>
+    </section>
+  </main>
+
+  <!-- Trang sửa công việc: đổi tên + gán người phụ trách -->
+  <div class="modal" id="edit-modal" hidden aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="edit-heading">
+      <h2 id="edit-heading">Sửa công việc</h2>
+      <label class="field">
+        <span>Tên công việc</span>
+        <input id="edit-title" autocomplete="off">
+      </label>
+      <div class="field">
+        <span>Người phụ trách</span>
+        <div class="picker">
+          <button type="button" class="picker-trigger" id="edit-owner-btn" aria-haspopup="listbox" aria-expanded="false">
+            <span class="picker-label muted" id="edit-owner-label">Chưa gán</span>
+            <span class="caret" aria-hidden="true">▾</span>
+          </button>
+          <div class="assign-menu" id="edit-owner-menu" hidden></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="ghost" id="edit-cancel" type="button">Hủy</button>
+        <button class="primary" id="edit-save" type="button">Lưu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="../js/app.js"></script>
+</body>
+</html>
