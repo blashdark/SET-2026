@@ -252,6 +252,15 @@ async function main() {
     const patchUser = await request('PATCH', `/user/${bob.id}`, { token, body: { email: 'bob2@test.com' } });
     check('PATCH /user/:id (removed) -> 404', patchUser.status === 404, patchUser);
 
+    // A user who still AUTHORED an unassigned task cannot be deleted: it would
+    // leave a task that nobody is allowed to delete.
+    const bobTask = await request('POST', '/task', { token: bob.accessToken, body: { title: 'Task C by bob' } });
+    const bobDeleteWithOwnTask = await request('DELETE', `/user/${bob.id}`, { token: bob.accessToken });
+    check('DELETE /user (authored task) -> 409', bobDeleteWithOwnTask.status === 409, bobDeleteWithOwnTask);
+
+    const bobDeleteOwnTask = await request('DELETE', `/task/${bobTask.data.id}`, { token: bob.accessToken });
+    check('DELETE /task (own authored, unassigned) -> 204', bobDeleteOwnTask.status === 204, bobDeleteOwnTask);
+
     const bobDeleteUser = await request('DELETE', `/user/${bob.id}`, { token: bob.accessToken });
     check('DELETE /user (no tasks) -> 204', bobDeleteUser.status === 204, bobDeleteUser);
 

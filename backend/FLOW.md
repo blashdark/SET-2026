@@ -86,7 +86,7 @@ Không DB engine. Hai file CSV dạng **fixed-length**: mọi dòng dài bằng 
 - **Đọc** (`get*`/`list*`): `email → id` là tra Map; lấy dòng thì `readRow` seek `(id-1) × ROW` và giải mã 1 dòng.
 - **Ghi** (`createUser`, `activateUser`, `setPasswordHash`, `createTask`, `updateTask`, `assignTask`…): `create` nối 1 dòng cuối file, `update` ghi đè đúng offset; cập nhật index. Mỗi thay đổi ghi **đồng bộ 1 dòng** (không dirty/flush định kỳ); `flush()` chỉ `fsync` (gọi khi exit/SIGINT/SIGTERM).
 - Codec: `encodeRow` (pad ô bằng space đủ độ rộng, chèn `,` ở vị trí cố định) / `decodeRow` (cắt theo **byte offset**, dấu phẩy trong giá trị vẫn an toàn). Vượt độ rộng → `400` từ `index.js` (`email` ≤ 64, `title` ≤ 128 byte).
-- API giữ nguyên nên `index.js` chỉ thêm validate độ dài: users: `getUserById`, `getUserByEmail`, `getUserByVerifyToken`, `createUser`, `activateUser`, `setVerifyToken`, `setPasswordHash`, `deleteUser`, `listUsers(limit, offset)`, `countUsers`, `countUserTasks`; tasks: `findTaskById`, `listUserTasks`, `createTask`, `updateTask`, `assignTask`, `deleteTask`.
+- API giữ nguyên nên `index.js` chỉ thêm validate độ dài: users: `getUserById`, `getUserByEmail`, `getUserByVerifyToken`, `createUser`, `activateUser`, `setVerifyToken`, `setPasswordHash`, `deleteUser`, `listUsers(limit, offset)`, `countUsers`, `countUserTasks`, `countTasksCreatedBy`; tasks: `findTaskById`, `listUserTasks`, `createTask`, `updateTask`, `assignTask`, `deleteTask`.
 
 > File cũ dạng snapshot (variable-length + header) được chuyển một lần bằng `scripts/migrate-to-fixed.js`.
 
@@ -106,7 +106,7 @@ Không DB engine. Hai file CSV dạng **fixed-length**: mọi dòng dài bằng 
 | `GET /me` | (inline) | trả `publicUser(user)` |
 | `GET /users` | (inline) | phân trang `?limit&offset` → `{ total, limit, offset, items }` |
 | `GET /user/:id` | (inline) | trả `publicUser` của 1 user; không thấy → `404` |
-| `DELETE /user/:id` | `deleteUser` | không thấy `404`; còn task `409`; ngược lại `204` |
+| `DELETE /user/:id` | `deleteUser` | không thấy `404`; còn task (tạo hoặc được gán) `409`; ngược lại `204` |
 | `POST /task` | `createTask` | cần `title`; task mới `user_id = null`, `created_by` = user token → `201` |
 | `GET /tasks` | (inline) | `listTasks()` — board dùng chung, trả **tất cả** task (chỉ xem) |
 | `PATCH /task/:id` | `updateTask` | tác giả: đầy đủ; người được giao: chỉ `done`; còn lại → `403`; merge title/done + (tùy chọn) `user_id` → `200` |

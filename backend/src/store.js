@@ -39,6 +39,17 @@ const rowSize = (layout) => layout.reduce((n, [, width]) => n + width + 1, 0);
 const USERS_ROW = rowSize(USERS_LAYOUT); // 340
 const TASKS_ROW = rowSize(TASKS_LAYOUT); // 180
 
+// Byte offset/width of the users 'status' cell, so listUsers can skip dead rows
+// by comparing 8 bytes instead of decoding the whole row.
+const STATUS_FIELD = (() => {
+  let off = 0;
+  for (const [name, width] of USERS_LAYOUT) {
+    if (name === 'status') return { off, len: width };
+    off += width + 1;
+  }
+})();
+const FREE_CELL = Buffer.from('free'.padEnd(STATUS_FIELD.len, ' '));
+
 // User input must fit its cell; index.js rejects longer values with a 400.
 const MAX_EMAIL_BYTES = USERS_LAYOUT[0][1]; // 64
 const MAX_TITLE_BYTES = TASKS_LAYOUT[0][1]; // 128
@@ -97,7 +108,8 @@ const toNumOrNull = (v) => (v === '' || v == null ? null : Number(v));
 
 const emailToId = new Map(); // email -> user id
 const tokenToId = new Map(); // verify token -> user id
-const tasksByUser = new Map(); // user id -> Set(task id)
+const tasksByUser = new Map(); // assigned user id -> Set(task id)
+const tasksCreatedBy = new Map(); // author user id -> Set(task id they created)
 let userCount = 0;
 let taskCount = 0;
 let usersSlots = 0; // rows present in users.csv (including free)
@@ -146,6 +158,11 @@ function loadTasks() {
       if (userId !== null) {
         if (!tasksByUser.has(userId)) tasksByUser.set(userId, new Set());
         tasksByUser.get(userId).add(id);
+      }
+      const createdBy = toNumOrNull(row.created_by);
+      if (createdBy !== null) {
+        if (!tasksCreatedBy.has(createdBy)) tasksCreatedBy.set(createdBy, new Set());
+        tasksCreatedBy.get(createdBy).add(id);
       }
     }
     base += rows;
@@ -268,17 +285,30 @@ function deleteUser(id) {
   userCount -= 1;
 }
 
-// Users are stored in id order, so skip/take is cheap (reads only what it returns).
+// Users are stored in id order and rows are fixed-length, so read the file
+// sequentially in CHUNK-sized blocks (one syscall per CHUNK rows, not per row)
+// and stop once the page is full. Deep offsets cost ~1 sequential scan.
 function listUsers(limit = 50, offset = 0) {
   const lim = Number(limit);
   let skip = Number(offset);
   const out = [];
-  for (let index = 0; index < usersSlots; index += 1) {
-    const row = readRow(usersFd, USERS_LAYOUT, USERS_ROW, index);
-    if (!row || row.status === 'free') continue;
-    if (skip > 0) { skip -= 1; continue; }
-    out.push({ id: index + 1, email: row.email, status: row.status, created_at: row.created_at });
-    if (out.length >= lim) break;
+  const CHUNK = 512;
+  const buf = Buffer.alloc(USERS_ROW * CHUNK);
+  let base = 0;
+  while (out.length < lim && base < usersSlots) {
+    const bytes = fs.readSync(usersFd, buf, 0, buf.length, base * USERS_ROW);
+    const rows = Math.floor(bytes / USERS_ROW);
+    if (rows === 0) break;
+    for (let r = 0; r < rows && out.length < lim; r += 1) {
+      const off = r * USERS_ROW;
+      const cell = buf.subarray(off + STATUS_FIELD.off, off + STATUS_FIELD.off + STATUS_FIELD.len);
+      if (cell.equals(FREE_CELL)) continue; // dead row: cheap byte compare, no decode
+      if (skip > 0) { skip -= 1; continue; }
+      const row = decodeRow(USERS_LAYOUT, buf.subarray(off, off + USERS_ROW));
+      out.push({ id: base + r + 1, email: row.email, status: row.status, created_at: row.created_at });
+    }
+    base += rows;
+    if (bytes < buf.length) break;
   }
   return out;
 }
@@ -289,6 +319,11 @@ function countUsers() {
 
 function countUserTasks(userId) {
   const set = tasksByUser.get(Number(userId));
+  return set ? set.size : 0;
+}
+
+function countTasksCreatedBy(userId) {
+  const set = tasksCreatedBy.get(Number(userId));
   return set ? set.size : 0;
 }
 
@@ -333,6 +368,18 @@ function unindexTask(id, userId) {
   if (set) { set.delete(id); if (!set.size) tasksByUser.delete(userId); }
 }
 
+function indexCreatedBy(id, userId) {
+  if (userId == null) return;
+  if (!tasksCreatedBy.has(userId)) tasksCreatedBy.set(userId, new Set());
+  tasksCreatedBy.get(userId).add(id);
+}
+
+function unindexCreatedBy(id, userId) {
+  if (userId == null) return;
+  const set = tasksCreatedBy.get(userId);
+  if (set) { set.delete(id); if (!set.size) tasksCreatedBy.delete(userId); }
+}
+
 function findTaskById(id) {
   const index = Number(id) - 1;
   if (!(index >= 0) || index >= tasksSlots) return null;
@@ -369,6 +416,7 @@ function createTask({ title, userId, createdBy }) {
   };
   putTask(id, row);
   indexTask(id, toNumOrNull(row.user_id));
+  indexCreatedBy(id, toNumOrNull(row.created_by));
   taskCount += 1;
   return toTask(id, row);
 }
@@ -401,6 +449,7 @@ function deleteTask(id) {
   const task = findTaskById(id);
   if (!task) return;
   unindexTask(task.id, task.user_id);
+  unindexCreatedBy(task.id, task.created_by);
   const row = taskRow(task);
   row.alive = '0';
   putTask(task.id, row);
@@ -461,6 +510,7 @@ module.exports = {
   listUsers,
   countUsers,
   countUserTasks,
+  countTasksCreatedBy,
   findTaskById,
   listUserTasks,
   listTasks,

@@ -284,7 +284,11 @@ async function resendVerification(res, body) {
 function deleteUser(res, id) {
   if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id người dùng không hợp lệ');
   if (!db.getUserById(id)) return fail(res, 404, 'Không tìm thấy người dùng');
-  if (db.countUserTasks(id) > 0) return fail(res, 409, 'Người dùng còn công việc, không thể xoá'); // block while tasks remain
+  // Block while the user is assigned a task OR still authored one: deleting an
+  // author would leave a task that nobody is allowed to delete (see deleteTask).
+  if (db.countUserTasks(id) > 0 || db.countTasksCreatedBy(id) > 0) {
+    return fail(res, 409, 'Người dùng còn công việc, không thể xoá');
+  }
 
   db.deleteUser(id);
   return noContent(res);

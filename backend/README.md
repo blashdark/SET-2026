@@ -117,7 +117,7 @@ Tối thiểu 8 ký tự, có **≥1 chữ hoa, ≥1 chữ thường, ≥1 ký t
 | 5 | GET | `/me` | Có | Thông tin user đang đăng nhập |
 | 6 | GET | `/users` | Có | Danh sách user, phân trang `?limit=50&offset=0` → `{ total, limit, offset, items }` |
 | 7 | GET | `/user/:id` | Có | Lấy 1 user theo id |
-| 8 | DELETE | `/user/:id` | Có | Xóa user (chặn nếu còn task) |
+| 8 | DELETE | `/user/:id` | Có | Xóa user (chặn nếu còn task tạo hoặc được gán) |
 | 9 | POST | `/task` | Có | Tạo task |
 | 10 | GET | `/tasks` | Có | Lấy tất cả task (board dùng chung, chỉ xem) |
 | 11 | PATCH | `/task/:id` | Có | Sửa task (title/done, tùy chọn `user_id`) — chỉ tác giả |
@@ -131,7 +131,7 @@ Tối thiểu 8 ký tự, có **≥1 chữ hoa, ≥1 chữ thường, ≥1 ký t
 - Ngoại lệ: **người được giao** (`user_id` = mình) được `PATCH /task/:id` để **đổi `done`** (chỉ mỗi `done`); sửa title/gán vẫn phải là tác giả.
 - `DELETE /task/:id` cũng chỉ tác giả, và chỉ khi task **đã hoàn thành hoặc chưa được giao**; nếu không → `403`.
 - `PATCH /assign-task/:id` body `{ "user_id": <id> }` đổi người phụ trách (`400` nếu thiếu/sai `user_id`, `404` nếu task hoặc user đích không tồn tại).
-- `DELETE /user/:id` bị chặn (`409`) nếu user còn task. Không còn endpoint `PATCH /user/:id`.
+- `DELETE /user/:id` bị chặn (`409`) nếu user còn task **do họ tạo** hoặc **đang được gán**. Không còn endpoint `PATCH /user/:id`.
 
 ### Mã lỗi
 

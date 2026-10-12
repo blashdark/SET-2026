@@ -76,6 +76,32 @@ function ok(name, cond, detail) {
   ok('user count drops', again.countUsers() === 0, again.countUsers());
 }
 
+// 5. listUsers pagination skips freed rows; countTasksCreatedBy tracks authors.
+{
+  const DIR2 = fs.mkdtempSync(path.join(os.tmpdir(), 'store-test2-'));
+  process.env.DATA_DIR = DIR2;
+  let store = reload();
+  const ids = [];
+  for (let i = 1; i <= 5; i += 1) ids.push(store.createUser({ email: `u${i}@x.com`, passwordHash: 'h', salt: 's' }).id);
+  store.deleteUser(ids[1]); // free the 2nd user
+  store.flush();
+
+  store = reload();
+  const page1 = store.listUsers(2, 0).map((u) => u.id);
+  const page2 = store.listUsers(2, 2).map((u) => u.id);
+  ok('listUsers page 1 skips freed row', page1.join(',') === `${ids[0]},${ids[2]}`, page1);
+  ok('listUsers page 2 (offset 2)', page2.join(',') === `${ids[3]},${ids[4]}`, page2);
+  ok('listUsers(10, 0) counts only live', store.listUsers(10, 0).length === 4, store.listUsers(10, 0).length);
+
+  const owned = store.createTask({ title: 'owned', userId: null, createdBy: ids[0] });
+  ok('countTasksCreatedBy counts author', store.countTasksCreatedBy(ids[0]) === 1, store.countTasksCreatedBy(ids[0]));
+  store.deleteTask(owned.id);
+  ok('countTasksCreatedBy drops after delete', store.countTasksCreatedBy(ids[0]) === 0, store.countTasksCreatedBy(ids[0]));
+
+  store.close();
+  try { fs.rmSync(DIR2, { recursive: true, force: true }); } catch { /* file handles held open on Windows */ }
+}
+
 try { fs.rmSync(DIR, { recursive: true, force: true }); } catch { /* file handles held open on Windows */ }
 console.log(failures === 0 ? '\nAll checks passed' : `\n${failures} check(s) failed`);
 process.exit(failures === 0 ? 0 : 1);
