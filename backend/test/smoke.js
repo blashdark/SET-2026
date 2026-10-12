@@ -198,6 +198,9 @@ async function main() {
     const assignMissingTask = await request('PATCH', '/assign-task/999', { token, body: { user_id: bob.id } });
     check('PATCH /assign-task/999 -> 404', assignMissingTask.status === 404, assignMissingTask);
 
+    const bobAssignForeign = await request('PATCH', '/assign-task/1', { token: bob.accessToken, body: { user_id: bob.id } });
+    check('PATCH /assign-task/1 (not author) -> 403', bobAssignForeign.status === 403, bobAssignForeign);
+
     // PATCH /task/:id can also assign via user_id in the body.
     const patchAssign = await request('PATCH', '/task/2', { token, body: { user_id: bob.id } });
     check('PATCH /task/2 (user_id) -> 200 assigned', patchAssign.status === 200 && patchAssign.data.user_id === bob.id, patchAssign);
@@ -208,14 +211,36 @@ async function main() {
     const patchAssignBad = await request('PATCH', '/task/2', { token, body: { user_id: 999 } });
     check('PATCH /task/2 (unknown user_id) -> 404', patchAssignBad.status === 404, patchAssignBad);
 
-    const aliceEditShared = await request('PATCH', '/task/1', { token, body: { title: 'edited by alice' } });
-    check('PATCH /task/1 (shared board, any user) -> 200', aliceEditShared.status === 200 && aliceEditShared.data.title === 'edited by alice', aliceEditShared);
+    const aliceEditOwn = await request('PATCH', '/task/1', { token, body: { title: 'edited by alice' } });
+    check('PATCH /task/1 (author) -> 200', aliceEditOwn.status === 200 && aliceEditOwn.data.title === 'edited by alice', aliceEditOwn);
 
-    const bobDeleteTask = await request('DELETE', '/task/1', { token: bob.accessToken });
-    check('DELETE /task/1 (assigned to bob) -> 204', bobDeleteTask.status === 204, bobDeleteTask);
+    const bobEditForeign = await request('PATCH', '/task/1', { token: bob.accessToken, body: { title: 'hijack' } });
+    check('PATCH /task/1 (not author) -> 403', bobEditForeign.status === 403, bobEditForeign);
 
-    const aliceDeleteOwn = await request('DELETE', '/task/2', { token });
-    check('DELETE /task/2 (shared board) -> 204', aliceDeleteOwn.status === 204, aliceDeleteOwn);
+    // the assignee (bob) may toggle done, but not edit other fields
+    const bobToggleDone = await request('PATCH', '/task/1', { token: bob.accessToken, body: { done: true } });
+    check('PATCH /task/1 (assignee, done) -> 200', bobToggleDone.status === 200 && bobToggleDone.data.done === true, bobToggleDone);
+
+    const bobEditAssigned = await request('PATCH', '/task/1', { token: bob.accessToken, body: { title: 'x' } });
+    check('PATCH /task/1 (assignee, title) -> 403', bobEditAssigned.status === 403, bobEditAssigned);
+
+    // reset so the delete-permission cases below start from "not done"
+    await request('PATCH', '/task/1', { token, body: { done: false } });
+
+    // DELETE /task/:id now requires the caller to be the author AND the task to be
+    // done or unassigned.
+    const bobDeleteForeign = await request('DELETE', '/task/1', { token: bob.accessToken });
+    check('DELETE /task/1 (not author) -> 403', bobDeleteForeign.status === 403, bobDeleteForeign);
+
+    const aliceDeleteAssigned = await request('DELETE', '/task/1', { token });
+    check('DELETE /task/1 (author, assigned & not done) -> 403', aliceDeleteAssigned.status === 403, aliceDeleteAssigned);
+
+    await request('PATCH', '/task/1', { token, body: { done: true } });
+    const aliceDeleteDone = await request('DELETE', '/task/1', { token });
+    check('DELETE /task/1 (author, done) -> 204', aliceDeleteDone.status === 204, aliceDeleteDone);
+
+    const aliceDeleteUnassigned = await request('DELETE', '/task/2', { token });
+    check('DELETE /task/2 (author, unassigned) -> 204', aliceDeleteUnassigned.status === 204, aliceDeleteUnassigned);
 
     // 8. user lookup + delete (the email-editing PATCH endpoint was removed)
     const userById = await request('GET', `/user/${bob.id}`, { token });

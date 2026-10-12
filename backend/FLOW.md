@@ -108,10 +108,10 @@ Không DB engine. Hai file CSV dạng **fixed-length**: mọi dòng dài bằng 
 | `GET /user/:id` | (inline) | trả `publicUser` của 1 user; không thấy → `404` |
 | `DELETE /user/:id` | `deleteUser` | không thấy `404`; còn task `409`; ngược lại `204` |
 | `POST /task` | `createTask` | cần `title`; task mới `user_id = null`, `created_by` = user token → `201` |
-| `GET /tasks` | (inline) | `listTasks()` — board dùng chung, trả **tất cả** task |
-| `PATCH /task/:id` | `updateTask` | merge title/done + (tùy chọn) `user_id` → `200` |
-| `DELETE /task/:id` | `deleteTask` | xóa task → `204` |
-| `PATCH /assign-task/:id` | `assignTask` | body `{ user_id }`; task/user không tồn tại → `404`; đổi chủ sở hữu → `200` |
+| `GET /tasks` | (inline) | `listTasks()` — board dùng chung, trả **tất cả** task (chỉ xem) |
+| `PATCH /task/:id` | `updateTask` | tác giả: đầy đủ; người được giao: chỉ `done`; còn lại → `403`; merge title/done + (tùy chọn) `user_id` → `200` |
+| `DELETE /task/:id` | `deleteTask` | chỉ tác giả và task đã xong/chưa giao; nếu không → `403`; ngược lại `204` |
+| `PATCH /assign-task/:id` | `assignTask` | chỉ tác giả (`403`); body `{ user_id }`; task/user không tồn tại → `404`; đổi người phụ trách → `200` |
 
 ## 8. Vòng đời xác thực email
 

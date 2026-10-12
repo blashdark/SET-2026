@@ -304,7 +304,14 @@ function updateTask(res, id, body, user) {
   if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id công việc không hợp lệ');
   const task = db.findTaskById(id);
   if (!task) return fail(res, 404, 'Không tìm thấy công việc');
-  // Shared board: any authenticated user may edit any task (see GET /tasks).
+
+  const isAuthor = task.created_by === user.id;
+  const isAssignee = task.user_id === user.id;
+  if (!isAuthor && !isAssignee) return fail(res, 403, 'Chỉ sửa được công việc do mình tạo hoặc được giao');
+  // The assignee may only toggle 'done'; title and assignment stay with the author.
+  if (!isAuthor && (body.title !== undefined || body.user_id !== undefined)) {
+    return fail(res, 403, 'Chỉ được đánh dấu hoàn thành cho công việc được giao');
+  }
 
   const nextTitle = body.title !== undefined ? String(body.title).trim() : undefined;
   if (nextTitle !== undefined) {
@@ -333,11 +340,14 @@ function updateTask(res, id, body, user) {
   return send(res, 200, updated);
 }
 
-function assignTask(res, id, body) {
-  const userId = Number(body.user_id); // target owner comes from the body
+function assignTask(res, id, body, user) {
   if (!Number.isInteger(id) || id <= 0) return fail(res, 400, 'Id công việc không hợp lệ');
+  const task = db.findTaskById(id);
+  if (!task) return fail(res, 404, 'Không tìm thấy công việc');
+  if (task.created_by !== user.id) return fail(res, 403, 'Chỉ gán được công việc do mình tạo');
+
+  const userId = Number(body.user_id); // target owner comes from the body
   if (!Number.isInteger(userId) || userId <= 0) return fail(res, 400, 'Trường user_id phải là số nguyên dương');
-  if (!db.findTaskById(id)) return fail(res, 404, 'Không tìm thấy công việc');
   if (!db.getUserById(userId)) return fail(res, 404, 'Không tìm thấy người dùng đích');
 
   return send(res, 200, db.assignTask(id, userId));
@@ -348,7 +358,11 @@ function deleteTask(res, id, user) {
 
   const task = db.findTaskById(id);
   if (!task) return fail(res, 404, 'Không tìm thấy công việc');
-  // Shared board: any authenticated user may delete any task.
+  // Only the author may delete, and only once the task is finished or unassigned.
+  const mayDelete = task.created_by === user.id && (task.done || task.user_id === null);
+  if (!mayDelete) {
+    return fail(res, 403, 'Chỉ xoá được công việc do mình tạo khi đã hoàn thành hoặc chưa được giao');
+  }
 
   db.deleteTask(id);
   return noContent(res);
@@ -394,7 +408,7 @@ const server = http.createServer(async (req, res) => { // called for every reque
     if (method === 'GET' && path === '/tasks') return send(res, 200, db.listTasks()); // shared board: all tasks
     if (method === 'PATCH' && path.startsWith('/task/')) return updateTask(res, idFrom(path, '/task/'), await readBody(req), user);
     if (method === 'DELETE' && path.startsWith('/task/')) return deleteTask(res, idFrom(path, '/task/'), user);
-    if (method === 'PATCH' && path.startsWith('/assign-task/')) return assignTask(res, idFrom(path, '/assign-task/'), await readBody(req));
+    if (method === 'PATCH' && path.startsWith('/assign-task/')) return assignTask(res, idFrom(path, '/assign-task/'), await readBody(req), user);
     if (method === 'GET' && path.startsWith('/user/')) {
       const u = db.getUserById(idFrom(path, '/user/'));
       if (!u) return fail(res, 404, 'Không tìm thấy người dùng');

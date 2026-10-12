@@ -14,6 +14,7 @@ let usersLoading = false;
 let tasks = [];
 let editingTaskId = null;
 let editOwnerId = null;
+let currentUserId = null; // id of the logged-in user (from GET /me)
 
 const $ = (id) => document.getElementById(id);
 
@@ -213,11 +214,15 @@ function renderTasks() {
     const li = document.createElement('li');
     li.className = 'task' + (task.done ? ' done' : '');
 
-    // checkbox at the start -> toggle done
+    const isAuthor = task.created_by === currentUserId;
+    const isAssignee = task.user_id === currentUserId;
+
+    // checkbox at the start -> toggle done (author, or the assigned user)
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'task-check';
     cb.checked = task.done;
+    cb.disabled = !(isAuthor || isAssignee);
     cb.setAttribute('aria-label', 'Đánh dấu hoàn thành: ' + task.title);
     cb.addEventListener('change', () => toggleDone(task.id, cb.checked));
     li.append(cb);
@@ -237,51 +242,56 @@ function renderTasks() {
     const actions = document.createElement('div');
     actions.className = 'task-actions';
 
-    // assign (person icon) -> dropdown of users (scroll to load more)
-    const wrap = document.createElement('div');
-    wrap.className = 'assign-wrap';
-    const assignBtn = document.createElement('button');
-    assignBtn.type = 'button';
-    assignBtn.className = 'icon-btn';
-    assignBtn.title = 'Gán người phụ trách';
-    assignBtn.setAttribute('aria-label', 'Gán người phụ trách cho: ' + task.title);
-    assignBtn.setAttribute('aria-haspopup', 'true');
-    assignBtn.setAttribute('aria-expanded', 'false');
-    assignBtn.append(iconSvg('person'));
+    if (isAuthor) {
+      // assign (person icon) -> dropdown of users (scroll to load more)
+      const wrap = document.createElement('div');
+      wrap.className = 'assign-wrap';
+      const assignBtn = document.createElement('button');
+      assignBtn.type = 'button';
+      assignBtn.className = 'icon-btn';
+      assignBtn.title = 'Gán người phụ trách';
+      assignBtn.setAttribute('aria-label', 'Gán người phụ trách cho: ' + task.title);
+      assignBtn.setAttribute('aria-haspopup', 'true');
+      assignBtn.setAttribute('aria-expanded', 'false');
+      assignBtn.append(iconSvg('person'));
 
-    const menu = document.createElement('div');
-    menu.className = 'assign-menu';
-    menu.hidden = true;
-    buildUserMenu(menu, {
-      heading: 'Gán cho',
-      selectedId: task.user_id,
-      allowNone: !!task.user_id,
-      onPick: (uid) => { if (uid == null) unassignTask(task.id); else assignTask(task.id, uid); }
-    });
+      const menu = document.createElement('div');
+      menu.className = 'assign-menu';
+      menu.hidden = true;
+      buildUserMenu(menu, {
+        heading: 'Gán cho',
+        selectedId: task.user_id,
+        allowNone: !!task.user_id,
+        onPick: (uid) => { if (uid == null) unassignTask(task.id); else assignTask(task.id, uid); }
+      });
 
-    assignBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(menu, assignBtn); });
-    wrap.append(assignBtn, menu);
-    actions.append(wrap);
+      assignBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMenu(menu, assignBtn); });
+      wrap.append(assignBtn, menu);
+      actions.append(wrap);
 
-    // edit (pencil icon) -> edit form
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'icon-btn';
-    editBtn.title = 'Sửa';
-    editBtn.setAttribute('aria-label', 'Sửa công việc: ' + task.title);
-    editBtn.append(iconSvg('pencil'));
-    editBtn.addEventListener('click', () => openEdit(task.id));
-    actions.append(editBtn);
+      // edit (pencil icon) -> edit form
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'icon-btn';
+      editBtn.title = 'Sửa';
+      editBtn.setAttribute('aria-label', 'Sửa công việc: ' + task.title);
+      editBtn.append(iconSvg('pencil'));
+      editBtn.addEventListener('click', () => openEdit(task.id));
+      actions.append(editBtn);
+    }
 
-    // delete (x icon)
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'icon-btn danger';
-    delBtn.title = 'Xóa';
-    delBtn.setAttribute('aria-label', 'Xóa công việc: ' + task.title);
-    delBtn.append(iconSvg('x'));
-    delBtn.addEventListener('click', () => deleteTask(task.id));
-    actions.append(delBtn);
+    // delete (x icon): only the author, and only once done or unassigned
+    const canDelete = isAuthor && (task.done || task.user_id === null);
+    if (canDelete) {
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'icon-btn danger';
+      delBtn.title = 'Xóa';
+      delBtn.setAttribute('aria-label', 'Xóa công việc: ' + task.title);
+      delBtn.append(iconSvg('x'));
+      delBtn.addEventListener('click', () => deleteTask(task.id));
+      actions.append(delBtn);
+    }
 
     li.append(actions);
     list.append(li);
@@ -407,6 +417,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMen
   if (!me) return;
   if (!me.ok) { logout(); return; }
   $('me').textContent = me.data.email;
+  currentUserId = me.data.id;
   localStorage.setItem('userEmail', me.data.email);
   await loadUsers();
   await loadTasks();

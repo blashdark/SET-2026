@@ -119,15 +119,18 @@ Tối thiểu 8 ký tự, có **≥1 chữ hoa, ≥1 chữ thường, ≥1 ký t
 | 7 | GET | `/user/:id` | Có | Lấy 1 user theo id |
 | 8 | DELETE | `/user/:id` | Có | Xóa user (chặn nếu còn task) |
 | 9 | POST | `/task` | Có | Tạo task |
-| 10 | GET | `/tasks` | Có | Lấy tất cả task (board dùng chung) |
-| 11 | PATCH | `/task/:id` | Có | Sửa task (title/done, tùy chọn `user_id`) |
-| 12 | DELETE | `/task/:id` | Có | Xóa task |
-| 13 | PATCH | `/assign-task/:id` | Có | Gán task (theo id) cho user khác |
+| 10 | GET | `/tasks` | Có | Lấy tất cả task (board dùng chung, chỉ xem) |
+| 11 | PATCH | `/task/:id` | Có | Sửa task (title/done, tùy chọn `user_id`) — chỉ tác giả |
+| 12 | DELETE | `/task/:id` | Có | Xóa task (chỉ chủ sở hữu, và chỉ khi đã xong hoặc chưa giao) |
+| 13 | PATCH | `/assign-task/:id` | Có | Gán task (theo id) cho user khác — chỉ tác giả |
 
 ### Quy tắc nghiệp vụ
 
-- Board dùng chung: `GET /tasks` trả **tất cả** task; `PATCH/DELETE /task/:id` áp dụng cho **mọi** task (mọi user đã đăng nhập đều sửa/xóa được). Không còn kiểm tra chủ sở hữu.
-- `PATCH /assign-task/:id` không phân quyền (theo yêu cầu bài tập); body `{ "user_id": <id> }` đổi chủ sở hữu (`400` nếu thiếu/sai `user_id`, `404` nếu task hoặc user đích không tồn tại).
+- Board hiển thị dùng chung: `GET /tasks` trả **tất cả** task cho mọi user đã đăng nhập (chỉ xem).
+- Task do **chính tác giả** quản lý: `PATCH /task/:id` (sửa title/done, gán qua `user_id`) và `PATCH /assign-task/:id` chỉ tác giả được gọi; người khác → `403`.
+- Ngoại lệ: **người được giao** (`user_id` = mình) được `PATCH /task/:id` để **đổi `done`** (chỉ mỗi `done`); sửa title/gán vẫn phải là tác giả.
+- `DELETE /task/:id` cũng chỉ tác giả, và chỉ khi task **đã hoàn thành hoặc chưa được giao**; nếu không → `403`.
+- `PATCH /assign-task/:id` body `{ "user_id": <id> }` đổi người phụ trách (`400` nếu thiếu/sai `user_id`, `404` nếu task hoặc user đích không tồn tại).
 - `DELETE /user/:id` bị chặn (`409`) nếu user còn task. Không còn endpoint `PATCH /user/:id`.
 
 ### Mã lỗi
@@ -136,7 +139,7 @@ Tối thiểu 8 ký tự, có **≥1 chữ hoa, ≥1 chữ thường, ≥1 ký t
 |--------|---------|
 | 400 | Dữ liệu không hợp lệ |
 | 401 | Chưa xác thực / sai đăng nhập / token hết hạn |
-| 403 | Email chưa xác thực (hoặc path tĩnh ngoài `frontend/`) |
+| 403 | Email chưa xác thực; hoặc thao tác task không phải của mình (tác giả/người được giao); hoặc xoá task đang được giao và chưa xong |
 | 404 | Không tìm thấy (hoặc sai method cho path) |
 | 409 | Xung đột (email trùng, user còn task) |
 | 410 | Link xác thực hết hạn |
