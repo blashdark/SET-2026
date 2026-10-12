@@ -95,6 +95,7 @@ function readBody(req) {
         const err = new Error('Nội dung yêu cầu quá lớn');
         err.status = 413;
         reject(err);
+        req.destroy(); // stop reading: we already have our answer
         return;
       }
       raw += chunk;
