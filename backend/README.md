@@ -141,7 +141,9 @@ Tối thiểu 8 ký tự, có **≥1 chữ hoa, ≥1 chữ thường, ≥1 ký t
 | 409 | Xung đột (email trùng, user còn task) |
 | 410 | Link xác thực hết hạn |
 
-## Hiệu năng (mục tiêu sign-up < 0.5ms)
+## Hiệu năng (mục tiêu sign-up < 0.5s)
+
+> Yêu cầu ban đầu ghi nhầm là 0.5ms; ngân sách đúng là **0.5 giây**.
 
 Hai script đo:
 
@@ -164,9 +166,9 @@ Chi phí từng phần (`npm run bench`, engine CSV):
 | `POST /sign-up` (HTTP) | ~0.69ms | ~0.63ms |
 
 Kết luận:
-- **Phần đồng bộ của register**: validate + check unique (Map) + **ghi 1 dòng user** (340 byte, ~µs) → vẫn < 0.5ms.
+- **Phần đồng bộ của register**: validate + check unique (Map) + **ghi 1 dòng user** (340 byte, ~µs) → cách mục tiêu 0.5s rất xa.
 - **Băm mật khẩu + gửi mail chạy nền** (scrypt async trên threadpool; mail fire-and-forget). `createUser` ghi **1 dòng nhỏ ngay trên request path** (rất nhanh) chứ không ghi lại cả file.
-- Nhưng **sàn HTTP của localhost đã ~0.4–0.5ms**, nên **latency một API call** thực tế ~0.6–0.7ms. Muốn số "< 0.5ms" thì tính **thời gian server xử lý** (đạt rõ ràng), hoặc báo p50 ~0.5ms + giải thích sàn HTTP.
+- **Độ trễ HTTP thật** (đã gồm sàn HTTP của localhost) chỉ ~0.7ms — vẫn dưới 0.5s rất nhiều.
 - Đánh đổi: vài chục ms đầu sau signup, login có thể nhận `409 "đang khởi tạo"` (chưa kịp có hash). Nếu crash đúng lúc đó, email vẫn đăng ký lại được (bản ghi hash rỗng bị coi là rác và bị ghi đè).
 
 ## Ví dụ với cURL
