@@ -15,25 +15,6 @@ function send(res, status, body) {
   res.end(body === undefined ? '' : JSON.stringify(body));
 }
 
-function readJsonBody(req) {
-  return new Promise((resolve) => {
-    let raw = '';
-    req.on('data', (chunk) => { raw += chunk; });
-    req.on('end', () => {
-      try {
-        resolve({ ok: true, value: JSON.parse(raw) });
-      } catch (err) {
-        resolve({ ok: false });
-      }
-    });
-    req.on('error', () => resolve({ ok: false }));
-  });
-}
-
-function isJsonObject(parsed) {
-  return parsed.ok && typeof parsed.value === 'object' && parsed.value !== null && !Array.isArray(parsed.value);
-}
-
 function isValidName(name) {
   return typeof name === 'string' && name.trim() !== '';
 }
@@ -75,7 +56,8 @@ function list(req, res) {
 }
 
 function getOne(req, res, { id }) {
-  const product = repository.findById(Number.parseInt(id, 10));
+  const productId = Number.parseInt(id, 10);
+  const product = repository.findById(productId);
   if (!product) {
     send(res, 404, { message: 'Không tìm thấy sản phẩm' });
     return;
@@ -84,17 +66,13 @@ function getOne(req, res, { id }) {
 }
 
 async function create(req, res) {
-  const parsed = await readJsonBody(req);
-  if (!isJsonObject(parsed)) {
-    send(res, 400, { message: 'Body không phải JSON hợp lệ' });
-    return;
-  }
-  if (!isValidProduct(parsed.value)) {
+  const body = req.body;
+  if (!isValidProduct(body)) {
     send(res, 400, { message: 'Thiếu hoặc sai name/price' });
     return;
   }
 
-  const product = repository.create(pickFields(parsed.value));
+  const product = repository.create(pickFields(body));
   send(res, 201, product);
 }
 
@@ -105,17 +83,13 @@ async function replace(req, res, { id }) {
     return;
   }
 
-  const parsed = await readJsonBody(req);
-  if (!isJsonObject(parsed)) {
-    send(res, 400, { message: 'Body không phải JSON hợp lệ' });
-    return;
-  }
-  if (!isValidProduct(parsed.value)) {
+  const body = req.body;
+  if (!isValidProduct(body)) {
     send(res, 400, { message: 'Thiếu hoặc sai name/price' });
     return;
   }
 
-  const product = repository.replace(productId, pickFields(parsed.value));
+  const product = repository.replace(productId, pickFields(body));
   send(res, 200, product);
 }
 
@@ -126,20 +100,15 @@ async function update(req, res, { id }) {
     return;
   }
 
-  const parsed = await readJsonBody(req);
-  if (!isJsonObject(parsed)) {
-    send(res, 400, { message: 'Body không phải JSON hợp lệ' });
-    return;
-  }
-
+  const body = req.body;
   // PATCH: chỉ validate field nào thực sự có mặt.
-  const patch = pickFields(parsed.value);
+  const patch = pickFields(body);
   if (Object.hasOwn(patch, 'name') && !isValidName(patch.name)) {
     send(res, 400, { message: 'Thiếu hoặc sai name/price' });
     return;
   }
   if (Object.hasOwn(patch, 'price') && !isValidPrice(patch.price)) {
-    send(res, 400, { message: 'Thiếu hoặc sai name/price' });
+    send(res, 400, { message: 'price phải là số >= 0' });
     return;
   }
 
@@ -148,7 +117,8 @@ async function update(req, res, { id }) {
 }
 
 function remove(req, res, { id }) {
-  const product = repository.remove(Number.parseInt(id, 10));
+  const productId = Number.parseInt(id, 10);
+  const product = repository.remove(productId);
   if (!product) {
     send(res, 404, { message: 'Không tìm thấy sản phẩm' });
     return;

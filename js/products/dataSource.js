@@ -6,9 +6,14 @@ const filePath = path.join(__dirname, 'products.json');
 // Đọc dữ liệu từ nơi lưu trữ (hiện tại là file JSON).
 function load() {
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
   } catch (err) {
-    return [];
+    if (err.code === 'ENOENT') {
+      return [];
+    }
+    console.error(`Lỗi đọc file dữ liệu (${filePath}):`, err.message);
+    throw err;
   }
 }
 
