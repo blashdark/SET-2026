@@ -1,0 +1,20 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "name": "Bút bi",
+      "price": 5000
+    },
+    {
+      "id": 2,
+      "name": "Vở kẻ ngang",
+      "price": 12000
+    },
+    {
+      "id": 3,
+      "name": "Bìa hồ sơ",
+      "price": 8000
+    }
+  ],
+  "nextId": 4
+}
