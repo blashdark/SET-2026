@@ -9,7 +9,7 @@ const routes = [
   { method: 'POST', path: '/products', middlewares: [requireToken], handler: productController.create },
   { method: 'PUT', path: '/products/:id', middlewares: [requireToken], handler: productController.replace },
   { method: 'PATCH', path: '/products/:id', middlewares: [requireToken], handler: productController.update },
-  { method: 'DELETE', path: '/products/:id', middlewares: [], handler: productController.remove },
+  { method: 'DELETE', path: '/products/:id', middlewares: [requireToken], handler: productController.remove },
 ];
 
 function matchPath(routePath, pathname) {
