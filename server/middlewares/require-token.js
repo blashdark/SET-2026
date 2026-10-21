@@ -3,7 +3,7 @@ const { sendJson } = require('../http-utils');
 const DEMO_TOKEN = 'demo-token';
 
 function requireToken(req, res) {
-  if (!req.headers.authorization) {
+  if (req.headers.authorization !== `Bearer ${DEMO_TOKEN}`) {
     res.setHeader('WWW-Authenticate', 'Bearer');
     sendJson(res, 401, { message: 'Thiếu token hoặc token sai' });
     return false;
