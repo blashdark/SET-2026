@@ -13,7 +13,7 @@ function list(req, res, params, url) {
 }
 
 function getById(req, res, params) {
-  const product = productRepository.findById(params.id);
+  const product = productRepository.findById(Number(params.id));
   if (!product) {
     sendJson(res, 404, { message: 'Không có product này' });
     return;
