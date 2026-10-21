@@ -1,18 +1,19 @@
 const controller = require('./controller');
+const { parseJsonBody } = require('./middleware');
 
 // Nhìn method + path để chọn hàm xử lý. Không đọc body,
 // không biết product là gì, chỉ chuyển id (nếu có) xuống controller.
 
 const routes = [
-  { method: 'GET', pattern: /^\/products\/?$/, handler: controller.list },
-  { method: 'POST', pattern: /^\/products\/?$/, handler: controller.create },
-  { method: 'GET', pattern: /^\/products\/([^/]+)\/?$/, handler: controller.getOne },
-  { method: 'PUT', pattern: /^\/products\/([^/]+)\/?$/, handler: controller.replace },
-  { method: 'PATCH', pattern: /^\/products\/([^/]+)\/?$/, handler: controller.update },
-  { method: 'DELETE', pattern: /^\/products\/([^/]+)\/?$/, handler: controller.remove },
+  { method: 'GET', pattern: /^\/products\/?$/, middlewares: [], handler: controller.list },
+  { method: 'POST', pattern: /^\/products\/?$/, middlewares: [parseJsonBody], handler: controller.create },
+  { method: 'GET', pattern: /^\/products\/([0-9]+)\/?$/, middlewares: [], handler: controller.getOne },
+  { method: 'PUT', pattern: /^\/products\/([0-9]+)\/?$/, middlewares: [parseJsonBody], handler: controller.replace },
+  { method: 'PATCH', pattern: /^\/products\/([0-9]+)\/?$/, middlewares: [parseJsonBody], handler: controller.update },
+  { method: 'DELETE', pattern: /^\/products\/([0-9]+)\/?$/, middlewares: [], handler: controller.remove },
 ];
 
-function route(req, res) {
+async function route(req, res) {
   const path = req.url.split('?')[0];
 
   for (const r of routes) {
@@ -24,7 +25,31 @@ function route(req, res) {
     if (!match) {
       continue;
     }
-    return r.handler(req, res, { id: match[1] });
+
+    const params = { id: match[1] };
+    const middlewares = r.middlewares || [];
+
+    let index = 0;
+
+    const next = async () => {
+      if (res.writableEnded || res.headersSent) {
+        return;
+      }
+      if (index < middlewares.length) {
+        const mw = middlewares[index++];
+        let called = false;
+        await mw(req, res, async () => {
+          if (called) return;
+          called = true;
+          await next();
+        });
+      } else {
+        await r.handler(req, res, params);
+      }
+    };
+
+    await next();
+    return;
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json' });

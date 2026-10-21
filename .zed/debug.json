@@ -1,0 +1,29 @@
+[
+  {
+    "label": "Debug js/server.js",
+    "adapter": "JavaScript",
+    "type": "pwa-node",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/js/server.js",
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Debug backend/index.js",
+    "adapter": "JavaScript",
+    "type": "pwa-node",
+    "request": "launch",
+    "program": "$ZED_WORKTREE_ROOT/backend/index.js",
+    "cwd": "$ZED_WORKTREE_ROOT/backend",
+    "env": {
+      "PORT": "3000",
+      "JWT_SECRET": "dev-secret-change-me"
+    }
+  },
+  {
+    "label": "Attach to Node (port 9229)",
+    "adapter": "JavaScript",
+    "type": "pwa-node",
+    "request": "attach",
+    "port": 9229
+  }
+]
