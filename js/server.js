@@ -1,10 +1,15 @@
 const http = require('http');
-const { logger } = require('./products/middleware');
+const { logger, requireToken } = require('./products/middleware');
 const route = require('./products/router');
 
 // server.js chỉ là composition root: wire middleware -> router.
 
 const middlewares = [logger];
+
+// Bật kiểm token bằng biến môi trường, ví dụ: API_TOKEN=secret node js/server.js
+if (process.env.API_TOKEN) {
+  middlewares.push(requireToken(process.env.API_TOKEN));
+}
 
 function sendServerError(res) {
   if (res.headersSent) {

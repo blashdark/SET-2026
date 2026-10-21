@@ -6,12 +6,15 @@ function logger(req, res, next) {
   next();
 }
 
-// Ví dụ middleware kiểm token: tự trả 401 và dừng nếu sai.
+// Middleware kiểm token: tự trả 401 (kèm WWW-Authenticate) và dừng nếu sai.
 function requireToken(token) {
   return function (req, res, next) {
     const header = req.headers['authorization'] || '';
     if (header !== `Bearer ${token}`) {
-      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.writeHead(401, {
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': 'Bearer',
+      });
       res.end(JSON.stringify({ message: 'Thiếu hoặc sai token' }));
       return;
     }

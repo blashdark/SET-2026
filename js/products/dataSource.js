@@ -13,8 +13,11 @@ function load() {
 }
 
 // Ghi đè toàn bộ dữ liệu xuống nơi lưu trữ.
+// Ghi ra file tạm rồi rename để tránh file bị hỏng dở dang.
 function save(products) {
-  fs.writeFileSync(filePath, JSON.stringify(products, null, 2), 'utf8');
+  const tmpPath = `${filePath}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(products, null, 2), 'utf8');
+  fs.renameSync(tmpPath, filePath);
 }
 
 module.exports = { load, save };
