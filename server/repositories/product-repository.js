@@ -40,7 +40,7 @@ function remove(id) {
   const data = dataSource.load();
   const index = data.products.findIndex((p) => p.id === id);
   if (index === -1) return false;
-  data.products.splice(index);
+  data.products.splice(index, 1);
   dataSource.save(data);
   return true;
 }
