@@ -38,9 +38,9 @@ function pickFields(body) {
   return result;
 }
 
-function list(req, res) {
+async function list(req, res) {
   const url = new URL(req.url, 'http://localhost');
-  const products = repository.all();
+  const products = await repository.all();
 
   if (url.searchParams.has('limit')) {
     const limit = Number.parseInt(url.searchParams.get('limit'), 10);
@@ -55,9 +55,9 @@ function list(req, res) {
   send(res, 200, products);
 }
 
-function getOne(req, res, { id }) {
+async function getOne(req, res, { id }) {
   const productId = Number.parseInt(id, 10);
-  const product = repository.findById(productId);
+  const product = await repository.findById(productId);
   if (!product) {
     send(res, 404, { message: 'Không tìm thấy sản phẩm' });
     return;
@@ -72,13 +72,13 @@ async function create(req, res) {
     return;
   }
 
-  const product = repository.create(pickFields(body));
+  const product = await repository.create(pickFields(body));
   send(res, 201, product);
 }
 
 async function replace(req, res, { id }) {
   const productId = Number.parseInt(id, 10);
-  if (!repository.findById(productId)) {
+  if (!await repository.findById(productId)) {
     send(res, 404, { message: 'Không tìm thấy sản phẩm' });
     return;
   }
@@ -89,13 +89,17 @@ async function replace(req, res, { id }) {
     return;
   }
 
-  const product = repository.replace(productId, pickFields(body));
+  const product = await repository.replace(productId, pickFields(body));
+  if (!product) {
+    send(res, 404, { message: 'Không tìm thấy sản phẩm' });
+    return;
+  }
   send(res, 200, product);
 }
 
 async function update(req, res, { id }) {
   const productId = Number.parseInt(id, 10);
-  if (!repository.findById(productId)) {
+  if (!await repository.findById(productId)) {
     send(res, 404, { message: 'Không tìm thấy sản phẩm' });
     return;
   }
@@ -112,13 +116,17 @@ async function update(req, res, { id }) {
     return;
   }
 
-  const product = repository.update(productId, patch);
+  const product = await repository.update(productId, patch);
+  if (!product) {
+    send(res, 404, { message: 'Không tìm thấy sản phẩm' });
+    return;
+  }
   send(res, 200, product);
 }
 
-function remove(req, res, { id }) {
+async function remove(req, res, { id }) {
   const productId = Number.parseInt(id, 10);
-  const product = repository.remove(productId);
+  const product = await repository.remove(productId);
   if (!product) {
     send(res, 404, { message: 'Không tìm thấy sản phẩm' });
     return;

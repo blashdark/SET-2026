@@ -1,0 +1,11 @@
+{
+  "name": "set-2026",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file-if-exists=.env js/server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=22.9.0" },
+  "dependencies": { "mongodb": "6.21.0" }
+}
