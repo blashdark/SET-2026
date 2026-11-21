@@ -1,6 +1,12 @@
 const http = require('http');
 const { logger, requireToken } = require('./products/middleware');
-const route = require('./products/router');
+const productRoute = require('./products/router');
+let reportRoute;
+try {
+  reportRoute = require('./reports/router');
+} catch {
+  // Graceful fallback if reports module isn't loaded
+}
 
 // server.js chỉ là composition root: wire middleware -> router.
 
@@ -19,6 +25,15 @@ function sendServerError(res) {
   res.end(JSON.stringify({ message: 'Lỗi server' }));
 }
 
+async function dispatch(req, res) {
+  const path = req.url ? req.url.split('?')[0] : '';
+  if (path.startsWith('/reports') && reportRoute) {
+    const handled = await reportRoute(req, res);
+    if (handled) return;
+  }
+  await productRoute(req, res);
+}
+
 function run(req, res, index) {
   const middleware = middlewares[index];
 
@@ -28,7 +43,7 @@ function run(req, res, index) {
   }
 
   try {
-    const result = route(req, res);
+    const result = dispatch(req, res);
     if (result && typeof result.catch === 'function') {
       result.catch(() => sendServerError(res));
     }
