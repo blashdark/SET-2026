@@ -146,7 +146,8 @@ test('reports dataSource pipelines match requirements', async () => {
 
   assert.deepEqual(pipeline2[0], { $match: { status: 'paid' } });
   assert.deepEqual(pipeline2[1], { $unwind: '$items' });
-  assert.deepEqual(pipeline2[2], {
+  assert.deepEqual(pipeline2[2], { $sort: { 'items.name': 1 } });
+  assert.deepEqual(pipeline2[3], {
     $group: {
       _id: '$items.productId',
       name: { $first: '$items.name' },
@@ -154,8 +155,8 @@ test('reports dataSource pipelines match requirements', async () => {
       totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
     },
   });
-  assert.deepEqual(pipeline2[3], { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } });
-  assert.deepEqual(pipeline2[4], {
+  assert.deepEqual(pipeline2[4], { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } });
+  assert.deepEqual(pipeline2[5], {
     $project: {
       _id: 0,
       productId: '$_id',
@@ -172,9 +173,9 @@ test('reports dataSource supports limit and customerId filtering', async () => {
   assert.equal(aggregateQueries.length, 1);
   const topPipeline = aggregateQueries[0];
   // $limit is placed right after $sort
-  assert.deepEqual(topPipeline[3], { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } });
-  assert.deepEqual(topPipeline[4], { $limit: 5 });
-  assert.deepEqual(topPipeline[5], {
+  assert.deepEqual(topPipeline[4], { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } });
+  assert.deepEqual(topPipeline[5], { $limit: 5 });
+  assert.deepEqual(topPipeline[6], {
     $project: {
       _id: 0,
       productId: '$_id',
@@ -234,6 +235,12 @@ test('reports controller and router return status 200 and report payload', async
   assert.equal(req2.handled, true);
   assert.equal(req2.res.status, 200);
   assert.deepEqual(req2.res.body, aggregateResult);
+
+  // Test parseLimit strict checks
+  assert.equal(dataSource.parseLimit ? dataSource.parseLimit('2.5') : 0, 0);
+  assert.equal(dataSource.parseLimit ? dataSource.parseLimit('-1') : 0, 0);
+  assert.equal(dataSource.parseLimit ? dataSource.parseLimit('abc') : 0, 0);
+  assert.equal(dataSource.parseLimit ? dataSource.parseLimit('200') : 100, 100);
 
   // Unmatched route in reports router returns handled: false
   const req3 = await mockRequest('GET', '/reports/unknown');

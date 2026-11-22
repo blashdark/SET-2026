@@ -77,8 +77,10 @@ test('MongoDB CRUD preserves numeric IDs, concurrent creates, HTTP contracts and
   assert.deepEqual((await request('PATCH', '/products/1', { price: 25, stock: 30, id: 88 })).body, { id: 1, name: 'Coffee', price: 25, stock: 30 });
   assert.equal((await request('PATCH', '/products/1', {})).status, 200);
   assert.equal((await request('POST', '/products', { name: '', price: -1 })).status, 400);
+  assert.equal((await request('POST', '/products', { name: 'Latte', price: 10 })).status, 400);
   assert.equal((await request('POST', '/products', { name: 'Latte', price: 10, stock: -5 })).status, 400);
   assert.equal((await request('POST', '/products', { name: 'Latte', price: 10, stock: 'invalid' })).status, 400);
+  assert.equal((await request('PUT', '/products/1', { name: 'Latte', price: 10 })).status, 400);
   assert.equal((await request('PATCH', '/products/1', { stock: -1 })).status, 400);
   assert.equal((await request('DELETE', '/products/1')).status, 204);
   for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) assert.equal((await request(method, '/products/999', {})).status, 404);
@@ -88,7 +90,7 @@ test('MongoDB CRUD preserves numeric IDs, concurrent creates, HTTP contracts and
   assert.equal(new Set(batch.map(p => p.id)).size, 20);
   assert.ok(batch.every(p => Number.isInteger(p.id) && !Object.hasOwn(p, '_id')));
   failure = new Error('database unavailable');
-  for (const [method, url, body] of [['GET','/products'], ['GET','/products/2'], ['POST','/products',{name:'X',price:1}], ['PUT','/products/2',{name:'X',price:1}], ['PATCH','/products/2',{price:1}], ['DELETE','/products/2']]) {
+  for (const [method, url, body] of [['GET','/products'], ['GET','/products/2'], ['POST','/products',{name:'X',price:1,stock:1}], ['PUT','/products/2',{name:'X',price:1,stock:1}], ['PATCH','/products/2',{price:1}], ['DELETE','/products/2']]) {
     await assert.rejects(request(method, url, body), /database unavailable/);
   }
 });

@@ -97,11 +97,18 @@ Xếp hạng sản phẩm bán chạy nhất dựa trên tổng số lượng b�
 
 ## Seed & Database Setup
 
-Để áp dụng schema validation ($jsonSchema) và seed dữ liệu mẫu cho Day 34:
+Để khởi tạo cấu trúc MongoDB:
 
+1. **Khởi tạo Validator và Indexes**: Cần chạy lệnh này trước để thiết lập schema validation ($jsonSchema) và các unique/filtering index:
+```sh
+npm run setup-db
+```
+
+2. **Seed dữ liệu mẫu (Dev / Test)**:
 ```sh
 node --env-file-if-exists=.env js/db/seed.js
 ```
+> ⚠️ **Lưu ý**: Lệnh seed (`node js/db/seed.js`) sẽ **xoá sạch dữ liệu cũ** và chèn bộ dữ liệu mẫu ban đầu. Lệnh này **chỉ dùng cho môi trường dev/test**, không được chạy trên môi trường production.
 
 ---
 

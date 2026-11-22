@@ -5,8 +5,7 @@ let reportRoute;
 try {
   reportRoute = require('./reports/router');
 } catch (err) {
-  // Graceful fallback if reports module isn't loaded or in isolated mock vm
-  if (err && err.code && err.code !== 'MODULE_NOT_FOUND' && !err.message.includes('Unexpected module')) {
+  if (err.code !== 'MODULE_NOT_FOUND' && !err.message.includes('Unexpected module')) {
     throw err;
   }
 }
@@ -59,6 +58,7 @@ const server = http.createServer((req, res) => {
   run(req, res, 0);
 });
 
-server.listen(3000, () => {
-  console.log('Server đang chạy ở http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server đang chạy ở http://localhost:${PORT}`);
 });

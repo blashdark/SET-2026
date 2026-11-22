@@ -127,6 +127,8 @@ orders: {
 
 ## 6. Idempotency & Unique Index Trên Mã Đơn Hàng (E11000 $\to$ 409 Conflict)
 
+> **Lưu ý kiến trúc**: Repository hiện tại tập trung cốt lõi vào CRUD products và Aggregation Reports. Phần dưới đây là **đề xuất kiến trúc cho endpoint `POST /orders`** khi mở rộng nghiệp vụ: Bắt lỗi `E11000` $\to$ chuyển hóa thành HTTP `409 Conflict`.
+
 ### Rủi ro mạng (Network Glitch) & Double Submit:
 Khi người dùng ấn nút thanh toán trên ứng dụng di động hoặc web, gói tin HTTP POST gửi đi có thể bị timeout mạng hoặc do người dùng sốt ruột click đúp liên tiếp. Nếu không có cơ chế chặn trùng lặp, hai đơn hàng giống hệt nhau sẽ được tạo và tài khoản người dùng bị trừ tiền hai lần.
 
@@ -191,23 +193,15 @@ async function createOrder(req, res) {
       const customer = await customers.findOne({ _id: new ObjectId(customerId) }, { session });
       if (!customer) throw { status: 404, message: 'Khách hàng không tồn tại' };
 
-      // 2. Trừ tồn kho từng sản phẩm với điều kiện atomic stock >= quantity và snapshot giá
+      // 2. Snapshot thông tin giỏ hàng và tính tổng tiền
       let total = 0;
       const snapshottedItems = [];
-
       for (const item of items) {
-        const product = await products.findOneAndUpdate(
-          { _id: item.productId, stock: { $gte: item.quantity } },
-          { $inc: { stock: -item.quantity } },
-          { returnDocument: 'after', session }
-        );
-
+        const product = await products.findOne({ _id: item.productId }, { session });
         if (!product) {
-          throw { status: 400, message: `Sản phẩm ID ${item.productId} không đủ tồn kho hoặc không tồn tại` };
+          throw { status: 400, message: `Sản phẩm ID ${item.productId} không tồn tại` };
         }
-
-        const itemTotal = product.price * item.quantity;
-        total += itemTotal;
+        total += product.price * item.quantity;
         snapshottedItems.push({
           productId: product._id,
           name: product.name,
@@ -216,18 +210,38 @@ async function createOrder(req, res) {
         });
       }
 
-      // 3. Tạo order document
+      // 3. Tạo order document với trạng thái ban đầu là 'pending'
       const orderDoc = {
         code,
         customerId: customer._id,
         items: snapshottedItems,
         total,
-        status: 'paid', // hoặc 'pending' tùy luồng thanh toán
+        status: 'pending',
         createdAt: new Date(),
       };
-
       const insertResult = await orders.insertOne(orderDoc, { session });
-      createdOrder = { _id: insertResult.insertedId, ...orderDoc };
+
+      // 4. Trừ tồn kho từng sản phẩm với điều kiện atomic stock >= quantity
+      for (const item of items) {
+        const product = await products.findOneAndUpdate(
+          { _id: item.productId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          { returnDocument: 'after', session }
+        );
+
+        if (!product) {
+          throw { status: 400, message: `Sản phẩm ID ${item.productId} không đủ tồn kho` };
+        }
+      }
+
+      // 5. Cập nhật trạng thái đơn hàng thành 'paid' sau khi trừ kho thành công
+      await orders.updateOne(
+        { _id: insertResult.insertedId },
+        { $set: { status: 'paid' } },
+        { session }
+      );
+
+      createdOrder = { _id: insertResult.insertedId, ...orderDoc, status: 'paid' };
     });
 
     res.writeHead(201, { 'Content-Type': 'application/json' });

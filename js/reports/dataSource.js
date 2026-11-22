@@ -33,8 +33,10 @@ if (sharedDb && sharedDb.orders && sharedDb.customers) {
 
 function parseLimit(limit, defaultVal = 0, maxVal = 100) {
   if (limit === undefined || limit === null) return defaultVal;
-  const parsed = parseInt(limit, 10);
-  if (!Number.isInteger(parsed) || parsed <= 0) return defaultVal;
+  const str = String(limit).trim();
+  if (!/^\d+$/.test(str)) return defaultVal;
+  const parsed = parseInt(str, 10);
+  if (parsed <= 0) return defaultVal;
   return Math.min(parsed, maxVal);
 }
 
@@ -101,6 +103,7 @@ async function topSellingProducts(options = {}) {
   const pipeline = [
     { $match: { status: 'paid' } },
     { $unwind: '$items' },
+    { $sort: { 'items.name': 1 } },
     {
       $group: {
         _id: '$items.productId',
@@ -134,6 +137,7 @@ async function close() {
 }
 
 module.exports = {
+  parseLimit,
   revenueByCustomer,
   topSellingProducts,
   close,

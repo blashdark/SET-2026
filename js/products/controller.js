@@ -24,6 +24,10 @@ function isValidPrice(price) {
 }
 
 function isValidStock(stock) {
+  return stock !== undefined && Number.isInteger(stock) && stock >= 0;
+}
+
+function isValidPatchStock(stock) {
   if (stock === undefined) return true;
   return Number.isInteger(stock) && stock >= 0;
 }
@@ -120,7 +124,7 @@ async function update(req, res, { id }) {
     send(res, 400, { message: 'price phải là số >= 0' });
     return;
   }
-  if (Object.hasOwn(patch, 'stock') && !isValidStock(patch.stock)) {
+  if (Object.hasOwn(patch, 'stock') && !isValidPatchStock(patch.stock)) {
     send(res, 400, { message: 'stock phải là số nguyên >= 0' });
     return;
   }
