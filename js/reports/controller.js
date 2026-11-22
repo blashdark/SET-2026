@@ -17,20 +17,36 @@ function parseQueryParams(url) {
 }
 
 async function revenueByCustomer(req, res) {
-  const params = parseQueryParams(req.url);
-  const options = {};
-  if (params.limit) options.limit = params.limit;
-  if (params.customerId) options.customerId = params.customerId;
-  const data = await repository.revenueByCustomer(options);
-  send(res, 200, data);
+  try {
+    const params = parseQueryParams(req.url);
+    const options = {};
+    if (params.limit) options.limit = params.limit;
+    if (params.customerId) options.customerId = params.customerId;
+    const data = await repository.revenueByCustomer(options);
+    send(res, 200, data);
+  } catch (err) {
+    if (err.status === 400) {
+      send(res, 400, { message: err.message });
+      return;
+    }
+    throw err;
+  }
 }
 
 async function topSellingProducts(req, res) {
-  const params = parseQueryParams(req.url);
-  const options = {};
-  if (params.limit) options.limit = params.limit;
-  const data = await repository.topSellingProducts(options);
-  send(res, 200, data);
+  try {
+    const params = parseQueryParams(req.url);
+    const options = {};
+    if (params.limit) options.limit = params.limit;
+    const data = await repository.topSellingProducts(options);
+    send(res, 200, data);
+  } catch (err) {
+    if (err.status === 400) {
+      send(res, 400, { message: err.message });
+      return;
+    }
+    throw err;
+  }
 }
 
 module.exports = {

@@ -1,7 +1,10 @@
 let sharedDb;
 try {
   sharedDb = require('../db');
-} catch {
+} catch (err) {
+  if (err.code !== 'MODULE_NOT_FOUND') {
+    throw err;
+  }
   // Graceful fallback for isolated unit test environments
 }
 
@@ -30,11 +33,12 @@ if (sharedDb && sharedDb.products && sharedDb.counters) {
 
 function toProduct(doc) {
   if (!doc) return null;
-  const result = { id: doc._id, name: doc.name, price: doc.price };
-  if (doc.stock !== undefined) {
-    result.stock = doc.stock;
-  }
-  return result;
+  return {
+    id: doc._id,
+    name: doc.name,
+    price: doc.price,
+    ...(doc.stock !== undefined ? { stock: doc.stock } : {}),
+  };
 }
 
 async function all() {

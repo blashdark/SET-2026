@@ -75,7 +75,9 @@ Mỗi phần tử trong mảng `orders.items` snapshot lại toàn bộ trạng 
 MongoDB không áp đặt ràng buộc khóa ngoại (Foreign Key Constraints / Cascading Triggers) ở cấp độ engine lưu trữ như RDBMS (MySQL, PostgreSQL). Do đó, trách nhiệm đảm bảo toàn vẹn dữ liệu thuộc về **Tầng Dịch Vụ Ứng Dụng (Application Layer / Business Logic)**:
 
 1. **Kiểm tra tồn tại trước khi tạo**: Trước khi insert đơn hàng, ứng dụng thực hiện truy vấn kiểm tra sự tồn tại của `customerId` trong collection `customers` và các `productId` trong `products`.
-2. **Chính sách Soft Delete**: Không bao giờ thực hiện `deleteOne()` trên `products` hay `customers` đã từng phát sinh đơn hàng. Thay vào đó, áp dụng cờ `isArchived: true` hoặc `deletedAt: ISODate` để duy trì toàn vẹn dữ liệu cho báo cáo và hóa đơn cũ.
+2. **Chính sách Soft Delete (Đề xuất kiến trúc cho tương lai)**:
+   - *Hiện trạng bài tập*: Để đáp ứng bài test và chuẩn CRUD cơ bản, endpoint `DELETE /products/:id` hiện đang thực hiện xoá vật lý trực tiếp (`findOneAndDelete`).
+   - *Đề xuất kiến trúc cho production*: Tuyệt đối không bao giờ thực hiện xoá cứng (`deleteOne()` / `findOneAndDelete()`) trên các thực thể `products` hay `customers` đã từng phát sinh đơn hàng lịch sử. Thay vào đó, thiết kế cột cờ `isArchived: true` hoặc `deletedAt: ISODate`. Khi truy vấn danh mục bán hàng thường ngày, thêm điều kiện `{ isArchived: { $ne: true } }` hoặc `{ deletedAt: null }`. Nhờ đó, tính toàn vẹn tham chiếu của đơn hàng cũ vẫn được bảo lưu vĩnh viễn cho mục đích kế toán, kiểm toán và báo cáo doanh thu.
 3. **Phòng chống Orphaned References**: Trong các pipeline tổng hợp báo cáo (ví dụ `$lookup` từ `orders` sang `customers`), sử dụng `preserveNullAndEmptyArrays: true` ở stage `$unwind`. Kỹ thuật này giúp hệ thống không làm mất doanh thu trong trường hợp một khách hàng hi hữu bị xoá hoặc chưa kịp đồng bộ thông tin định danh.
 
 ---
@@ -128,13 +130,18 @@ orders: {
 ### Rủi ro mạng (Network Glitch) & Double Submit:
 Khi người dùng ấn nút thanh toán trên ứng dụng di động hoặc web, gói tin HTTP POST gửi đi có thể bị timeout mạng hoặc do người dùng sốt ruột click đúp liên tiếp. Nếu không có cơ chế chặn trùng lặp, hai đơn hàng giống hệt nhau sẽ được tạo và tài khoản người dùng bị trừ tiền hai lần.
 
-### Thiết kế Idempotency Key & Unique Index:
+### Idempotency Key & Các Indexes Đã Được Cấu Hình Trong Schema:
 1. **Mã đơn hàng nghiệp vụ (`code`)**: Được sinh ra ở phía client hoặc API Gateway đóng vai trò khóa Idempotency Key (ví dụ `ORD-<timestamp>-<hash>`).
-2. **Chỉ mục Unique Index**: Tạo chỉ mục độc nhất trên trường `code` của collection `orders`:
+2. **Chỉ mục Unique Index trên `code`**: Tạo chỉ mục độc nhất trên trường `code` của collection `orders`:
    ```javascript
    await orders.createIndex({ code: 1 }, { unique: true, name: 'uniq_order_code' });
    ```
-3. **Bắt mã lỗi E11000**:
+3. **Chỉ mục trên `status` (`idx_order_status`)**: Tạo chỉ mục đơn trên trường `status` của collection `orders`:
+   ```javascript
+   await orders.createIndex({ status: 1 }, { name: 'idx_order_status' });
+   ```
+   Chỉ mục này đóng vai trò tối quan trọng đối với các Aggregation Pipeline báo cáo doanh thu và top sản phẩm bán chạy, giúp stage `{ $match: { status: 'paid' } }` quét chỉ mục (Index Scan - IXSCAN) cực nhanh thay vì phải quét toàn bộ collection (Collection Scan - COLLSCAN).
+4. **Bắt mã lỗi E11000**:
    - Khi request thứ hai cố tình chèn mã đơn hàng đã tồn tại, MongoDB Storage Engine quăng lỗi duplicate key:
      `MongoServerError: E11000 duplicate key error collection: set2026.orders index: uniq_order_code`.
    - Tầng điều khiển (Controller / Error Middleware) bắt mã lỗi này và chuyển hóa thành mã trạng thái HTTP chuẩn `409 Conflict` (thay vì 500 Internal Server Error):
@@ -167,34 +174,81 @@ if (!updatedProduct) {
 ```
 Biểu thức `{ stock: { $gte: item.quantity } }` đóng vai trò là khóa lạc quan (Optimistic Check) loại trừ hoàn toàn race condition.
 
-### Giải pháp 2: Multi-Document ACID Transaction (Yêu cầu Replica Set)
+### Giải pháp 2: Multi-Document ACID Transaction (Đề xuất kiến trúc chi tiết cho endpoint `POST /orders` trong môi trường Replica Set)
 Đối với đơn hàng mua nhiều mặt hàng cùng lúc, nếu mặt hàng thứ nhất trừ kho thành công nhưng mặt hàng thứ hai bị lỗi hoặc việc tạo order thất bại, hệ thống cần rollback lại toàn bộ trạng thái tồn kho của mặt hàng thứ nhất.
 - Khi hoạt động trong môi trường MongoDB Replica Set (bao gồm MongoDB Atlas), ta sử dụng `client.startSession()` và `session.withTransaction()`:
 
 ```javascript
-const session = client.startSession();
-try {
-  await session.withTransaction(async () => {
-    // 1. Trừ tồn kho từng sản phẩm với điều kiện stock >= quantity
-    for (const item of items) {
-      const res = await products.updateOne(
-        { _id: item.productId, stock: { $gte: item.quantity } },
-        { $inc: { stock: -item.quantity } },
-        { session }
-      );
-      if (res.matchedCount === 0) {
-        throw new Error(`Sản phẩm ${item.productId} không đủ số lượng tồn`);
-      }
-    }
+// Đề xuất quy trình xử lý tại controller/service cho POST /orders
+async function createOrder(req, res) {
+  const { code, customerId, items } = req.body;
+  const session = client.startSession();
 
-    // 2. Tạo đơn hàng
-    await orders.insertOne(orderDoc, { session });
-  });
-} finally {
-  await session.endSession();
+  try {
+    let createdOrder = null;
+    await session.withTransaction(async () => {
+      // 1. Kiểm tra khách hàng hợp lệ
+      const customer = await customers.findOne({ _id: new ObjectId(customerId) }, { session });
+      if (!customer) throw { status: 404, message: 'Khách hàng không tồn tại' };
+
+      // 2. Trừ tồn kho từng sản phẩm với điều kiện atomic stock >= quantity và snapshot giá
+      let total = 0;
+      const snapshottedItems = [];
+
+      for (const item of items) {
+        const product = await products.findOneAndUpdate(
+          { _id: item.productId, stock: { $gte: item.quantity } },
+          { $inc: { stock: -item.quantity } },
+          { returnDocument: 'after', session }
+        );
+
+        if (!product) {
+          throw { status: 400, message: `Sản phẩm ID ${item.productId} không đủ tồn kho hoặc không tồn tại` };
+        }
+
+        const itemTotal = product.price * item.quantity;
+        total += itemTotal;
+        snapshottedItems.push({
+          productId: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity,
+        });
+      }
+
+      // 3. Tạo order document
+      const orderDoc = {
+        code,
+        customerId: customer._id,
+        items: snapshottedItems,
+        total,
+        status: 'paid', // hoặc 'pending' tùy luồng thanh toán
+        createdAt: new Date(),
+      };
+
+      const insertResult = await orders.insertOne(orderDoc, { session });
+      createdOrder = { _id: insertResult.insertedId, ...orderDoc };
+    });
+
+    res.writeHead(201, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(createdOrder));
+  } catch (err) {
+    if (err.code === 11000) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ message: 'Mã đơn hàng đã tồn tại (Idempotency duplicate)' }));
+    }
+    if (err.status) {
+      res.writeHead(err.status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ message: err.message }));
+    }
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ message: 'Lỗi xử lý tạo đơn hàng' }));
+  } finally {
+    await session.endSession();
+  }
 }
 ```
-Quy trình này đảm bảo toàn bộ các thao tác ghi đều tuân thủ nguyên tắc ACID (Atomicity, Consistency, Isolation, Durability).
+Quy trình này đảm bảo toàn bộ các thao tác ghi đều tuân thủ nguyên tắc ACID (Atomicity, Consistency, Isolation, Durability), bảo vệ số liệu tồn kho chính xác tuyệt đối ngay cả khi chịu tải cao.
 
 ---
 

@@ -4,7 +4,7 @@ const schemas = {
   products: {
     $jsonSchema: {
       bsonType: 'object',
-      required: ['name', 'price'],
+      required: ['name', 'price', 'stock'],
       properties: {
         _id: {
           bsonType: ['int', 'long', 'double', 'objectId'],
@@ -137,6 +137,21 @@ async function setupSchemaAndIndexes(targetDb = db) {
   // Ensure unique index on orders.code
   const ordersCol = targetDb.collection('orders');
   await ordersCol.createIndex({ code: 1 }, { unique: true, name: 'uniq_order_code' });
+  await ordersCol.createIndex({ status: 1 }, { name: 'idx_order_status' });
+}
+
+if (require.main === module) {
+  setupSchemaAndIndexes()
+    .then(async () => {
+      console.log('Schema validation and indexes set up successfully.');
+      const { close } = require('../db');
+      if (close) await close();
+      process.exit(0);
+    })
+    .catch((err) => {
+      console.error('Failed to setup schema and indexes:', err);
+      process.exit(1);
+    });
 }
 
 module.exports = {

@@ -1,7 +1,10 @@
 let sharedDb;
 try {
   sharedDb = require('../db');
-} catch {
+} catch (err) {
+  if (err.code !== 'MODULE_NOT_FOUND') {
+    throw err;
+  }
   // Graceful fallback for isolated test environments
 }
 
@@ -28,22 +31,25 @@ if (sharedDb && sharedDb.orders && sharedDb.customers) {
   customers = db.collection('customers');
 }
 
-function parseLimit(limit, defaultVal = 0) {
+function parseLimit(limit, defaultVal = 0, maxVal = 100) {
   if (limit === undefined || limit === null) return defaultVal;
   const parsed = parseInt(limit, 10);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultVal;
+  if (!Number.isInteger(parsed) || parsed <= 0) return defaultVal;
+  return Math.min(parsed, maxVal);
 }
 
 async function revenueByCustomer(options = {}) {
   const matchStage = { status: 'paid' };
-  if (options.customerId) {
-    if (typeof options.customerId === 'string' && ObjectId.isValid(options.customerId)) {
-      matchStage.customerId = new ObjectId(options.customerId);
-    } else {
-      matchStage.customerId = options.customerId;
+  if (options.customerId !== undefined) {
+    if (typeof options.customerId !== 'string' || !ObjectId.isValid(options.customerId)) {
+      const err = new Error('customerId không hợp lệ (phải là chuỗi hex 24 ký tự ObjectId)');
+      err.status = 400;
+      throw err;
     }
+    matchStage.customerId = new ObjectId(options.customerId);
   }
 
+  const limit = parseLimit(options.limit);
   const pipeline = [
     { $match: matchStage },
     {
@@ -54,6 +60,13 @@ async function revenueByCustomer(options = {}) {
       },
     },
     { $sort: { totalSpent: -1 } },
+  ];
+
+  if (limit > 0) {
+    pipeline.push({ $limit: limit });
+  }
+
+  pipeline.push(
     {
       $lookup: {
         from: 'customers',
@@ -78,17 +91,13 @@ async function revenueByCustomer(options = {}) {
         orderCount: 1,
       },
     },
-  ];
-
-  const limit = parseLimit(options.limit);
-  if (limit > 0) {
-    pipeline.push({ $limit: limit });
-  }
+  );
 
   return orders.aggregate(pipeline).toArray();
 }
 
 async function topSellingProducts(options = {}) {
+  const limit = parseLimit(options.limit);
   const pipeline = [
     { $match: { status: 'paid' } },
     { $unwind: '$items' },
@@ -101,21 +110,21 @@ async function topSellingProducts(options = {}) {
       },
     },
     { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } },
-    {
-      $project: {
-        _id: 0,
-        productId: '$_id',
-        name: 1,
-        totalQuantitySold: 1,
-        totalRevenue: 1,
-      },
-    },
   ];
 
-  const limit = parseLimit(options.limit);
   if (limit > 0) {
     pipeline.push({ $limit: limit });
   }
+
+  pipeline.push({
+    $project: {
+      _id: 0,
+      productId: '$_id',
+      name: 1,
+      totalQuantitySold: 1,
+      totalRevenue: 1,
+    },
+  });
 
   return orders.aggregate(pipeline).toArray();
 }

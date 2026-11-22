@@ -111,6 +111,15 @@ async function seedData(collections = { products, customers, orders, counters })
 }
 
 async function runSeed() {
+  const env = process.env.NODE_ENV || 'development';
+  const allowSeed = env === 'development' || env === 'test' || process.env.ALLOW_SEED === 'true';
+
+  if (!allowSeed) {
+    console.error(`[CẢNH BÁO AN TOÀN] Không thể chạy seed trong môi trường '${env}'. Thao tác này sẽ xóa toàn bộ dữ liệu. Nếu bạn thực sự muốn chạy, hãy đặt biến môi trường ALLOW_SEED=true.`);
+    process.exit(1);
+  }
+
+  console.log(`[SEED] Đang khởi tạo dữ liệu mẫu trên môi trường '${env}'...`);
   await setupSchemaAndIndexes();
   await seedData();
   console.log('Seed sample data completed successfully.');

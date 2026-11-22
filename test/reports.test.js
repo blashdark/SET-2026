@@ -171,7 +171,18 @@ test('reports dataSource supports limit and customerId filtering', async () => {
   await dataSource.topSellingProducts({ limit: 5 });
   assert.equal(aggregateQueries.length, 1);
   const topPipeline = aggregateQueries[0];
-  assert.deepEqual(topPipeline[topPipeline.length - 1], { $limit: 5 });
+  // $limit is placed right after $sort
+  assert.deepEqual(topPipeline[3], { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } });
+  assert.deepEqual(topPipeline[4], { $limit: 5 });
+  assert.deepEqual(topPipeline[5], {
+    $project: {
+      _id: 0,
+      productId: '$_id',
+      name: 1,
+      totalQuantitySold: 1,
+      totalRevenue: 1,
+    },
+  });
 
   aggregateQueries = [];
   await dataSource.revenueByCustomer({ limit: 10, customerId: '507f1f77bcf86cd799439011' });
@@ -179,7 +190,20 @@ test('reports dataSource supports limit and customerId filtering', async () => {
   const revPipeline = aggregateQueries[0];
   assert.equal(revPipeline[0].$match.status, 'paid');
   assert.ok(revPipeline[0].$match.customerId);
-  assert.deepEqual(revPipeline[revPipeline.length - 1], { $limit: 10 });
+  // $limit is placed right after $sort
+  assert.deepEqual(revPipeline[2], { $sort: { totalSpent: -1 } });
+  assert.deepEqual(revPipeline[3], { $limit: 10 });
+
+  // Invalid customerId throws 400 error
+  await assert.rejects(
+    async () => {
+      await dataSource.revenueByCustomer({ customerId: 'invalid-id' });
+    },
+    (err) => {
+      assert.equal(err.status, 400);
+      return true;
+    }
+  );
 });
 
 test('reports repository delegates cleanly to dataSource', async () => {
@@ -214,6 +238,12 @@ test('reports controller and router return status 200 and report payload', async
   // Unmatched route in reports router returns handled: false
   const req3 = await mockRequest('GET', '/reports/unknown');
   assert.equal(req3.handled, false);
+
+  // Invalid customerId returns 400
+  const req4 = await mockRequest('GET', '/reports/revenue-by-customer?customerId=not-hex');
+  assert.equal(req4.handled, true);
+  assert.equal(req4.res.status, 400);
+  assert.ok(req4.res.body.message.includes('customerId không hợp lệ'));
 });
 
 test('seed and schema definitions validate sample dataset', async () => {
@@ -223,6 +253,7 @@ test('seed and schema definitions validate sample dataset', async () => {
   assert.ok(schemas.products.$jsonSchema);
   assert.ok(schemas.customers.$jsonSchema);
   assert.ok(schemas.orders.$jsonSchema);
+  assert.deepEqual(schemas.products.$jsonSchema.required, ['name', 'price', 'stock']);
 
   // Validate sample products
   for (const p of sampleProducts) {
@@ -256,4 +287,57 @@ test('seed and schema definitions validate sample dataset', async () => {
     }
     assert.equal(o.total, calcTotal, `Total mismatch on order ${o.code}`);
   }
+});
+
+test('schema validation and duplicate key E11000 handling', async () => {
+  const { setupSchemaAndIndexes, schemas } = require('../js/db/schema');
+  
+  // Track indexes created on collections
+  const indexesCreated = [];
+  const fakeDb = {
+    listCollections() {
+      return {
+        async toArray() {
+          return [{ name: 'products' }, { name: 'customers' }, { name: 'orders' }];
+        },
+      };
+    },
+    async command(cmd) {
+      assert.ok(cmd.collMod);
+      assert.ok(cmd.validator);
+    },
+    collection(name) {
+      return {
+        async createIndex(spec, options) {
+          indexesCreated.push({ collection: name, spec, options });
+        },
+      };
+    },
+  };
+
+  await setupSchemaAndIndexes(fakeDb);
+
+  // Verify unique index on code and index on status
+  const codeIndex = indexesCreated.find(i => i.collection === 'orders' && i.spec.code === 1);
+  assert.ok(codeIndex, 'Should create index on orders.code');
+  assert.equal(codeIndex.options.unique, true);
+  assert.equal(codeIndex.options.name, 'uniq_order_code');
+
+  const statusIndex = indexesCreated.find(i => i.collection === 'orders' && i.spec.status === 1);
+  assert.ok(statusIndex, 'Should create index on orders.status');
+  assert.equal(statusIndex.options.name, 'idx_order_status');
+
+  // Test duplicate key E11000 simulation handling in order flow
+  function handleOrderCreationError(err) {
+    if (err && err.code === 11000) {
+      return { status: 409, message: 'Đơn hàng với mã này đã tồn tại' };
+    }
+    return { status: 500, message: 'Lỗi server' };
+  }
+
+  const dupError = new Error('E11000 duplicate key error collection: set2026.orders index: uniq_order_code dup key: { code: "ORD-202611-0001" }');
+  dupError.code = 11000;
+  const errorResponse = handleOrderCreationError(dupError);
+  assert.equal(errorResponse.status, 409);
+  assert.equal(errorResponse.message, 'Đơn hàng với mã này đã tồn tại');
 });

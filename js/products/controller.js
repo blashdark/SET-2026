@@ -3,7 +3,7 @@ const repository = require('./repository');
 // Lấy id/query/body từ request, kiểm input, gọi repository,
 // chọn status và body. Không biết dữ liệu nằm ở mảng hay file.
 
-const PRODUCT_FIELDS = ['name', 'price'];
+const PRODUCT_FIELDS = ['name', 'price', 'stock'];
 
 function send(res, status, body) {
   if (status === 204) {
@@ -23,8 +23,13 @@ function isValidPrice(price) {
   return typeof price === 'number' && Number.isFinite(price) && price >= 0;
 }
 
+function isValidStock(stock) {
+  if (stock === undefined) return true;
+  return Number.isInteger(stock) && stock >= 0;
+}
+
 function isValidProduct(body) {
-  return isValidName(body.name) && isValidPrice(body.price);
+  return isValidName(body.name) && isValidPrice(body.price) && isValidStock(body.stock);
 }
 
 // Chỉ giữ các field hợp lệ (name, price) để field lạ không lọt vào file.
@@ -113,6 +118,10 @@ async function update(req, res, { id }) {
   }
   if (Object.hasOwn(patch, 'price') && !isValidPrice(patch.price)) {
     send(res, 400, { message: 'price phải là số >= 0' });
+    return;
+  }
+  if (Object.hasOwn(patch, 'stock') && !isValidStock(patch.stock)) {
+    send(res, 400, { message: 'stock phải là số nguyên >= 0' });
     return;
   }
 

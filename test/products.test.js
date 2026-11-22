@@ -66,17 +66,20 @@ async function request(method, url, body) {
 
 test('MongoDB CRUD preserves numeric IDs, concurrent creates, HTTP contracts and failures', async () => {
   assert.deepEqual(await repository.all(), []);
-  const created = await request('POST', '/products', { name: 'Tea', price: 10, id: 999, extra: true });
+  const created = await request('POST', '/products', { name: 'Tea', price: 10, stock: 50, id: 999, extra: true });
   assert.equal(created.status, 201);
-  assert.deepEqual(created.body, { id: 1, name: 'Tea', price: 10 });
+  assert.deepEqual(created.body, { id: 1, name: 'Tea', price: 10, stock: 50 });
   assert.equal(rows.size, 1, 'must persist in MongoDB collection, not JSON');
   assert.equal(clients, 1);
   assert.deepEqual((await request('GET', '/products?limit=1')).body, [created.body]);
   assert.deepEqual((await request('GET', '/products/1')).body, created.body);
-  assert.deepEqual((await request('PUT', '/products/1', { name: 'Coffee', price: 20 })).body, { id: 1, name: 'Coffee', price: 20 });
-  assert.deepEqual((await request('PATCH', '/products/1', { price: 25, id: 88 })).body, { id: 1, name: 'Coffee', price: 25 });
+  assert.deepEqual((await request('PUT', '/products/1', { name: 'Coffee', price: 20, stock: 15 })).body, { id: 1, name: 'Coffee', price: 20, stock: 15 });
+  assert.deepEqual((await request('PATCH', '/products/1', { price: 25, stock: 30, id: 88 })).body, { id: 1, name: 'Coffee', price: 25, stock: 30 });
   assert.equal((await request('PATCH', '/products/1', {})).status, 200);
   assert.equal((await request('POST', '/products', { name: '', price: -1 })).status, 400);
+  assert.equal((await request('POST', '/products', { name: 'Latte', price: 10, stock: -5 })).status, 400);
+  assert.equal((await request('POST', '/products', { name: 'Latte', price: 10, stock: 'invalid' })).status, 400);
+  assert.equal((await request('PATCH', '/products/1', { stock: -1 })).status, 400);
   assert.equal((await request('DELETE', '/products/1')).status, 204);
   for (const method of ['GET', 'PUT', 'PATCH', 'DELETE']) assert.equal((await request(method, '/products/999', {})).status, 404);
   assert.equal(await repository.replace(999, { name: 'Missing', price: 0 }), null);

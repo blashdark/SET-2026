@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start": "node --env-file-if-exists=.env js/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "setup-db": "node js/db/schema.js"
   },
   "engines": { "node": ">=22.9.0" },
   "dependencies": { "mongodb": "6.21.0" }
