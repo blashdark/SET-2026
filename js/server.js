@@ -4,8 +4,11 @@ const productRoute = require('./products/router');
 let reportRoute;
 try {
   reportRoute = require('./reports/router');
-} catch {
-  // Graceful fallback if reports module isn't loaded
+} catch (err) {
+  // Graceful fallback if reports module isn't loaded or in isolated mock vm
+  if (err && err.code && err.code !== 'MODULE_NOT_FOUND' && !err.message.includes('Unexpected module')) {
+    throw err;
+  }
 }
 
 // server.js chỉ là composition root: wire middleware -> router.
@@ -27,7 +30,7 @@ function sendServerError(res) {
 
 async function dispatch(req, res) {
   const path = req.url ? req.url.split('?')[0] : '';
-  if (path.startsWith('/reports') && reportRoute) {
+  if ((path === '/reports' || path.startsWith('/reports/')) && reportRoute) {
     const handled = await reportRoute(req, res);
     if (handled) return;
   }

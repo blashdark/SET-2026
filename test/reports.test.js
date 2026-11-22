@@ -19,6 +19,8 @@ const mockOrdersCollection = {
 };
 
 const mockCustomersCollection = {};
+const mockProductsCollection = {};
+const mockCountersCollection = {};
 
 const originalLoad = Module._load;
 Module._load = function (name, ...args) {
@@ -35,11 +37,21 @@ Module._load = function (name, ...args) {
             collection(colName) {
               if (colName === 'orders') return mockOrdersCollection;
               if (colName === 'customers') return mockCustomersCollection;
+              if (colName === 'products') return mockProductsCollection;
+              if (colName === 'counters') return mockCountersCollection;
               return {};
             },
           };
         }
         async close() {}
+      },
+      ObjectId: class ObjectId {
+        constructor(id) {
+          this.id = id;
+        }
+        static isValid(id) {
+          return typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id);
+        }
       },
     };
   }
@@ -120,7 +132,7 @@ test('reports dataSource pipelines match requirements', async () => {
     },
   });
 
-  // Test topSellingProducts pipeline
+  // Test topSellingProducts pipeline with tie-breakers
   aggregateQueries = [];
   const expectedTopProducts = [
     { productId: 'p1', name: 'Milk Tea', totalQuantitySold: 10, totalRevenue: 500 },
@@ -142,7 +154,7 @@ test('reports dataSource pipelines match requirements', async () => {
       totalRevenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } },
     },
   });
-  assert.deepEqual(pipeline2[3], { $sort: { totalQuantitySold: -1 } });
+  assert.deepEqual(pipeline2[3], { $sort: { totalQuantitySold: -1, totalRevenue: -1, _id: 1 } });
   assert.deepEqual(pipeline2[4], {
     $project: {
       _id: 0,
@@ -152,6 +164,22 @@ test('reports dataSource pipelines match requirements', async () => {
       totalRevenue: 1,
     },
   });
+});
+
+test('reports dataSource supports limit and customerId filtering', async () => {
+  aggregateQueries = [];
+  await dataSource.topSellingProducts({ limit: 5 });
+  assert.equal(aggregateQueries.length, 1);
+  const topPipeline = aggregateQueries[0];
+  assert.deepEqual(topPipeline[topPipeline.length - 1], { $limit: 5 });
+
+  aggregateQueries = [];
+  await dataSource.revenueByCustomer({ limit: 10, customerId: '507f1f77bcf86cd799439011' });
+  assert.equal(aggregateQueries.length, 1);
+  const revPipeline = aggregateQueries[0];
+  assert.equal(revPipeline[0].$match.status, 'paid');
+  assert.ok(revPipeline[0].$match.customerId);
+  assert.deepEqual(revPipeline[revPipeline.length - 1], { $limit: 10 });
 });
 
 test('reports repository delegates cleanly to dataSource', async () => {
@@ -178,7 +206,7 @@ test('reports controller and router return status 200 and report payload', async
     { productId: 'p10', name: 'Matcha Latte', totalQuantitySold: 20, totalRevenue: 1200 },
   ];
 
-  const req2 = await mockRequest('GET', '/reports/top-products');
+  const req2 = await mockRequest('GET', '/reports/top-products?limit=5');
   assert.equal(req2.handled, true);
   assert.equal(req2.res.status, 200);
   assert.deepEqual(req2.res.body, aggregateResult);
@@ -186,4 +214,46 @@ test('reports controller and router return status 200 and report payload', async
   // Unmatched route in reports router returns handled: false
   const req3 = await mockRequest('GET', '/reports/unknown');
   assert.equal(req3.handled, false);
+});
+
+test('seed and schema definitions validate sample dataset', async () => {
+  const { schemas } = require('../js/db/schema');
+  const { sampleCustomers, sampleProducts, sampleOrders } = require('../js/db/seed');
+
+  assert.ok(schemas.products.$jsonSchema);
+  assert.ok(schemas.customers.$jsonSchema);
+  assert.ok(schemas.orders.$jsonSchema);
+
+  // Validate sample products
+  for (const p of sampleProducts) {
+    assert.ok(typeof p.name === 'string');
+    assert.ok(typeof p.price === 'number' && p.price >= 0);
+    assert.ok(typeof p.stock === 'number' && p.stock >= 0);
+  }
+
+  // Validate sample customers
+  for (const c of sampleCustomers) {
+    assert.ok(typeof c.name === 'string');
+    assert.ok(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(c.email));
+  }
+
+  // Validate sample orders
+  const statuses = ['pending', 'paid', 'cancelled'];
+  const codes = new Set();
+  for (const o of sampleOrders) {
+    assert.ok(typeof o.code === 'string');
+    assert.ok(!codes.has(o.code), `Duplicate code ${o.code}`);
+    codes.add(o.code);
+    assert.ok(statuses.includes(o.status));
+    assert.ok(Array.isArray(o.items) && o.items.length > 0);
+    assert.ok(o.createdAt instanceof Date);
+    let calcTotal = 0;
+    for (const item of o.items) {
+      assert.ok(typeof item.name === 'string');
+      assert.ok(item.price >= 0);
+      assert.ok(item.quantity >= 1);
+      calcTotal += item.price * item.quantity;
+    }
+    assert.equal(o.total, calcTotal, `Total mismatch on order ${o.code}`);
+  }
 });

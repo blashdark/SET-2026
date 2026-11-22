@@ -53,12 +53,66 @@ khi xóa; thao tác tạo lỗi có thể để lại khoảng trống ID. Khôn
 riêng lẻ. Database mới bắt đầu rỗng; `js/products/products.json` giữ nguyên,
 không còn được đọc/ghi, không tự migration/seed. PUT/PATCH không upsert.
 
+---
+
+## Reports API (Day 34 Aggregation Pipelines)
+
+Cung cấp các báo cáo thống kê doanh thu và sản phẩm bán chạy sử dụng MongoDB Aggregation Pipeline:
+
+### 1. GET `/reports/revenue-by-customer`
+Tổng hợp doanh thu theo từng khách hàng từ các đơn hàng có trạng thái `paid`.
+- **Query parameters (tuỳ chọn)**:
+  - `limit`: Giới hạn số lượng bản ghi trả về (ví dụ: `?limit=10`).
+  - `customerId`: Lọc theo ID khách hàng cụ thể (hỗ trợ cả ObjectId hex string).
+- **Phản hồi mẫu (`200 OK`)**:
+```json
+[
+  {
+    "customerId": "673000000000000000000001",
+    "customerName": "Nguyễn Văn Thịnh",
+    "customerEmail": "thinh.nguyen@example.com",
+    "totalSpent": 110000,
+    "orderCount": 1
+  }
+]
+```
+
+### 2. GET `/reports/top-products`
+Xếp hạng sản phẩm bán chạy nhất dựa trên tổng số lượng bán ra (`totalQuantitySold`) từ các đơn hàng `paid`. Có sắp xếp tie-breaker theo `totalRevenue` giảm dần và `_id` tăng dần.
+- **Query parameters (tuỳ chọn)**:
+  - `limit`: Giới hạn số lượng sản phẩm đứng đầu (ví dụ: `?limit=5`).
+- **Phản hồi mẫu (`200 OK`)**:
+```json
+[
+  {
+    "productId": 1,
+    "name": "Trà Sữa Oolong Nướng",
+    "totalQuantitySold": 3,
+    "totalRevenue": 105000
+  }
+]
+```
+
+---
+
+## Seed & Database Setup
+
+Để áp dụng schema validation ($jsonSchema) và seed dữ liệu mẫu cho Day 34:
+
+```sh
+node --env-file-if-exists=.env js/db/seed.js
+```
+
+---
+
+## Kiểm thử
+
 ```sh
 npm test
 ```
 
 Tests mock driver, kiểm tra toàn bộ CRUD qua router/controller/repository/datasource,
-ID số, tạo đồng thời, 400/404/204 và truyền lỗi async; không ghi MongoDB thật.
+ID số, tạo đồng thời, 400/404/204, pipelines aggregation report và truyền lỗi async; không ghi MongoDB thật.
 
 Tài liệu driver:
 - https://www.mongodb.com/docs/drivers/node/v6.x/connect/mongoclient/
